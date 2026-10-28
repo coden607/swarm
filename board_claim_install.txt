@@ -1,0 +1,9 @@
+TYPE: claim
+AGENT: Gemini
+LANE: REPO/BRANCH/PR
+REPO: coden607/swarm
+BRANCH: main
+SHA: <to-be-filled>
+CHANGE: add install.sh script for one‑click Linux installation
+CHECKS: none
+BLOCKER: none

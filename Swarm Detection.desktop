@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Swarm Detection – One‑Click Installer
+Comment=Installs Docker, builds UI, starts service, and prints QR‑code
+Icon=network-workgroup
+Exec=/usr/local/bin/swarm-install
+Terminal=true
+Categories=Utility;Network;
+StartupNotify=false

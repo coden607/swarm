@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+opencv-python-headless
+google-generativeai
+python-dotenv
+pydub
+pyjwt
+fastapi-jwt-auth
+onvif-zeep
+hikvisionapi

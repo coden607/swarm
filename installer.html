@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Swarm Detection – One‑Click Installer</title>
+  <style>
+    body {font-family: Arial, sans-serif; margin:0; padding:2rem; background:#f5f5f5;}
+    .container {max-width:600px;margin:auto;background:#fff;padding:2rem;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+    h1 {text-align:center;}
+    button, a.button {display:block;width:100%;margin:1rem 0;padding:1rem;background:#2b8a3e;color:#fff;border:none;border-radius:4px;font-size:1rem;text-align:center;cursor:pointer; text-decoration:none;}
+    button:hover, a.button:hover {background:#267134;}
+    #msg {margin-top:1rem;color:#444;}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Swarm Detection – One‑Click Install</h1>
+    <p>This page detects your platform and triggers the appropriate installer with a single tap.</p>
+    <div id="actions"></div>
+    <div id="msg"></div>
+  </div>
+
+  <script>
+    const actionsDiv = document.getElementById('actions');
+    const msgDiv = document.getElementById('msg');
+    const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+
+    function createButton(label, href, onClick) {
+      const a = document.createElement('a');
+      a.className = 'button';
+      a.textContent = label;
+      if (href) a.href = href;
+      if (onClick) a.onclick = onClick;
+      return a;
+    }
+
+    if (/android/i.test(userAgent)) {
+      // Android – open Termux install page then run one‑liner via intent
+      const termuxLink = 'https://f-droid.org/packages/com.termux/';
+      const scriptUrl = 'https://raw.githubusercontent.com/your-org/swarm/main/android/setup_swarm.sh';
+      const runCmd = `bash -c "$(curl -fsSL ${scriptUrl})"`;
+      actionsDiv.appendChild(createButton('Install Termux (F‑Droid)', termuxLink));
+      actionsDiv.appendChild(createButton('Run Swarm Installer', '#', () => {
+        // Use the "intent:" scheme to open the terminal and paste the command
+        const intentUrl = `intent:#Intent;action=android.intent.action.VIEW;type=text/plain;S.android.intent.extra.TEXT=${encodeURIComponent(runCmd)};end`;
+        window.location = intentUrl;
+        msgDiv.textContent = 'If Termux is installed, the command will be pasted. Please press "Enter" in Termux.';
+      }));
+    } else if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
+      // iOS – direct user to the PWA UI (served by the Docker container once it’s up)
+      const uiUrl = 'https://YOUR_HOST_DOMAIN_OR_IP'; // replace with actual reachable host (HTTPS recommended)
+      actionsDiv.appendChild(createButton('Open Swarm UI (PWA)', uiUrl, () => {
+        msgDiv.textContent = 'Tap the Share button in Safari and select “Add to Home Screen” for a one‑tap app.';
+      }));
+    } else if (/Win|Mac|Linux/.test(userAgent)) {
+      // Desktop – download and execute the installer script (auto‑run on double‑click)
+      const scriptUrl = 'https://raw.githubusercontent.com/your-org/swarm/main/install.sh';
+      actionsDiv.appendChild(createButton('Download & Run Installer', scriptUrl, () => {
+        // For safety we just guide the user – they can double‑click after download
+        msgDiv.textContent = 'The installer script will be downloaded. Save it, make it executable (chmod +x), and run with sudo.';
+      }));
+    } else {
+      actionsDiv.appendChild(createButton('Manual Installation Guide', '#', () => {
+        msgDiv.textContent = 'Unsupported platform. Please refer to the README for manual steps.';
+      }));
+    }
+  </script>
+</body>
+</html>

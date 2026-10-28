@@ -1,0 +1,9 @@
+TYPE: claim
+AGENT: Gemini
+LANE: REPO/BRANCH/PR
+REPO: coden607/swarm
+BRANCH: main
+SHA: <to-be-filled>
+CHANGE: installer.html UI URL placeholder update
+CHECKS: none
+BLOCKER: none
