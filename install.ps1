@@ -110,7 +110,8 @@ if ($env:SWARM_NO_ICON -ne '1') {
 }
 
 try {
-  $act = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/c `"$Home_\swarm.cmd`" >> `"$Home_\swarm.log`" 2>&1"
+  $cmdArg = '/c ""' + "$Home_\swarm.cmd" + '" >> "' + "$Home_\swarm.log" + '" 2>&1"'
+  $act = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument $cmdArg
   $trg = New-ScheduledTaskTrigger -AtLogOn
   $set = New-ScheduledTaskSettingsSet -RestartCount 99 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable
   Register-ScheduledTask -TaskName 'Swarm Detection' -Action $act -Trigger $trg -Settings $set -Force | Out-Null
@@ -119,7 +120,7 @@ try {
   Log "Scheduled task 'Swarm Detection' registered (starts at logon, restarts on failure)"
 } catch {
   Warn "Could not register scheduled task ($($_.Exception.Message)); starting in background instead."
-  Start-Process cmd.exe -ArgumentList "/c `"$Home_\swarm.cmd`"" -WindowStyle Hidden
+  Start-Process -FilePath "$Home_\swarm.cmd" -WindowStyle Hidden -RedirectStandardOutput "$Home_\swarm.log" -RedirectStandardError "$Home_\swarm.err.log"
 }
 
 # 6. firewall (needs admin; best effort)
@@ -134,13 +135,13 @@ for ($i = 0; $i -lt 40; $i++) {
   if ($i -ge 12 -and -not $fell) {
     $fell = $true
     Warn 'Scheduled task has not started the server yet; starting it directly.'
-    Start-Process cmd.exe -ArgumentList "/c `"$Home_\swarm.cmd`" >> `"$Home_\swarm.log`" 2>&1" -WindowStyle Hidden
+    Start-Process -FilePath "$Home_\swarm.cmd" -WindowStyle Hidden -RedirectStandardOutput "$Home_\swarm.log" -RedirectStandardError "$Home_\swarm.err.log"
   }
   Start-Sleep 1
 }
 $ip = & $vpy -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.connect(('10.255.255.255',1)); print(s.getsockname()[0])" 2>$null
 if (-not $ip) { $ip = '127.0.0.1' }
-if (-not $up) { if (Test-Path "$Home_\swarm.log") { Write-Host '--- swarm.log (last 40 lines) ---'; Get-Content "$Home_\swarm.log" -Tail 40 }; throw "Installed but server did not answer on port $Port. See $Home_\swarm.log" }
+if (-not $up) { foreach ($lf in 'swarm.log','swarm.err.log') { if (Test-Path "$Home_\$lf") { Write-Host "--- $lf (last 40 lines) ---"; Get-Content "$Home_\$lf" -Tail 40 } }; throw "Installed but server did not answer on port $Port. See $Home_\swarm.log" }
 Log "Swarm is running: http://${ip}:$Port   (this PC: http://127.0.0.1:$Port)"
 if ($newPass) { Write-Host "`n  Login:    admin`n  Password: $newPass      (saved in $Home_\.env)`n" }
 if ($remote) { Write-Host "  Remote link (anywhere, login required) appears in the app within ~20 s, or see $Home_\data\tunnel.log" }
