@@ -1,17 +1,222 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Swarm Detection Dashboard</title>
-  <script type="module" src="/src/main.jsx"></script>
-  <style>
-    body {font-family: Arial, sans-serif; margin:0; padding:0;}
-    #root {padding:1rem;}
-    .camera-card {border:1px solid #ccc; border-radius:4px;padding:0.5rem;margin:0.5rem;}
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Swarm Detection</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="icon.svg" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<meta name="theme-color" content="#2b8a3e" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Swarm" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<style>
+  body{font-family:system-ui,-apple-system,Arial,sans-serif;margin:0;background:#f5f5f5;color:#222}
+  main{max-width:680px;margin:auto;padding:1rem;padding-top:max(1rem,env(safe-area-inset-top))}
+  .card{background:#fff;border-radius:8px;padding:1rem;margin:.75rem 0;box-shadow:0 1px 4px #0002}
+  input,select,button{font:inherit;padding:.6rem;margin:.25rem 0;width:100%;box-sizing:border-box}
+  button{background:#2b8a3e;color:#fff;border:0;border-radius:4px;cursor:pointer}
+  button.sec{background:#555} button.del{background:#c92a2a}
+  .row{display:flex;gap:.5rem}.row>*{flex:1}
+  .count{font-size:2rem;font-weight:700}
+  .alarm{background:#c92a2a;color:#fff} .alarm small{color:#fdd}
+  .off{background:#e67700;color:#fff}
+  small{color:#666;word-break:break-all} #err{color:#c92a2a}
+  #banner{text-align:center;font-size:1.3rem;padding:1rem}
+  #offline{display:none;text-align:center;font-weight:600}
+  .ev{font-size:.9rem;padding:.2rem 0;border-bottom:1px solid #eee}
+  video{display:none}
+</style>
 </head>
 <body>
-  <div id="root"></div>
+<main>
+  <h1>Swarm Detection</h1>
+  <div id="offline" class="card off"></div>
+  <div id="err"></div>
+
+  <div id="login" class="card" hidden>
+    <h3>Sign in</h3>
+    <input id="u" placeholder="Username" value="admin" autocomplete="username" />
+    <input id="p" type="password" placeholder="Password (ADMIN_PASS in .env)" autocomplete="current-password" />
+    <button id="go">Sign in</button>
+  </div>
+
+  <div id="app" hidden>
+    <div id="banner" class="card"></div>
+    <div class="card row">
+      <div><small>Combined swarm alert at (people, 0 = off)</small><input id="tt" type="number" min="0" value="0" /></div>
+      <div><small>&nbsp;</small><button id="tts" class="sec">Save</button></div>
+    </div>
+
+    <div id="list"></div>
+
+    <div class="card">
+      <h3>Recent alerts</h3>
+      <div id="events"><small>None yet</small></div>
+    </div>
+
+    <div class="card" id="addcard">
+      <h3>Add camera</h3>
+      <input id="curl" placeholder="Camera IP (192.168.1.20), rtsp://…, http://…, or 0 for USB webcam" />
+      <div class="row"><input id="cu" placeholder="Camera username (optional)" autocomplete="off" /><input id="cp" type="password" placeholder="Camera password" autocomplete="new-password" /></div>
+      <div class="row">
+        <select id="brand"><option value="generic">Brand: auto‑detect</option><option>onvif</option><option>hikvision</option><option>dahua</option><option>amcrest</option><option>axis</option><option>reolink</option><option>tapo</option><option>foscam</option><option>unifi</option></select>
+        <input id="thr" type="number" min="1" value="10" title="People that trigger an alert" />
+      </div>
+      <input id="cid" placeholder="Name (optional, e.g. front-door)" />
+      <button id="add">Add camera</button>
+      <div class="row"><button id="scan" class="sec">Scan network for cameras</button><button id="phone" class="sec">Use this device's camera</button></div>
+      <div id="found"></div>
+    </div>
+
+    <div class="card">
+      <div id="remote"><small>Remote access: checking…</small></div>
+      <button id="install" class="sec" hidden>Install app on this device</button>
+      <small id="ioshint" hidden>iPhone/iPad: tap <b>Share</b> → <b>Add to Home Screen</b>.</small>
+    </div>
+    <button id="out" class="sec">Sign out</button>
+  </div>
+</main>
+<video id="vid" playsinline muted></video>
+<script>
+const $ = id => document.getElementById(id);
+let token = null, audio = null, phoneTimer = null, tick = null, n = 0, installEvt = null;
+try { token = localStorage.getItem("swarm_token"); } catch (e) {}
+const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+
+async function api(path, opts = {}) {
+  const h = { ...(opts.headers || {}) };
+  if (token) h.Authorization = "Bearer " + token;
+  if (!(opts.body instanceof Blob)) h["Content-Type"] = "application/json";
+  const r = await fetch(path, { ...opts, headers: h });
+  if (r.status === 401 && token) { setToken(null); throw new Error("Session expired – sign in again"); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.detail || r.statusText);
+  return j;
+}
+function setToken(t) { token = t; try { t ? localStorage.setItem("swarm_token", t) : localStorage.removeItem("swarm_token"); } catch (e) {} render(); }
+function err(e) { $("err").textContent = e ? (e.message || e) : ""; }
+function beep() {
+  try { audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audio.createOscillator(), g = audio.createGain(); o.connect(g); g.connect(audio.destination);
+    o.frequency.value = 880; g.gain.value = .2; o.start(); o.stop(audio.currentTime + .4); } catch (e) {}
+}
+function notify(msg) { try { if (window.Notification && Notification.permission === "granted") new Notification("Swarm alert", { body: msg, icon: "icon-192.png", tag: "swarm" }); } catch (e) {} }
+function when(ts) { return new Date(ts).toLocaleString(); }
+
+async function render() {
+  clearInterval(tick);
+  $("login").hidden = !!token; $("app").hidden = !token;
+  if (!token) return;
+  await refresh(); tick = setInterval(refresh, 2000);
+}
+
+function draw(s, ev, offlineTs) {
+  const b = $("banner");
+  b.className = "card" + (s.alarm && !offlineTs ? " alarm" : "");
+  b.textContent = offlineTs ? `Last known: ${s.total} people across ${s.cameras.length} camera(s)` :
+    (s.alarm ? `⚠ SWARM DETECTED – ${s.total} people in view` : `All clear – ${s.total} people in view across ${s.cameras.length} camera(s)`);
+  if (document.activeElement !== $("tt")) $("tt").value = s.total_threshold;
+  const keep = document.activeElement && document.activeElement.closest("#list");
+  if (!keep) {
+    $("list").innerHTML = "";
+    s.cameras.forEach(c => {
+      const d = document.createElement("div"); d.className = "card" + (c.alarm && !offlineTs ? " alarm" : "");
+      d.innerHTML = `<div class="row"><b></b><span class="count" style="text-align:right"></span></div><small class="u"></small><br><small class="st"></small>
+        <div class="row"><input type="number" min="1" title="Alert threshold"><button class="sv">Save threshold</button><button class="del">Remove</button></div>`;
+      d.querySelector("b").textContent = `${c.id} (${c.brand})`;
+      d.querySelector(".count").textContent = c.count === null ? "–" : c.count;
+      d.querySelector(".u").textContent = c.resolved || c.url;
+      d.querySelector(".st").textContent = c.status;
+      const inp = d.querySelector("input"); inp.value = c.threshold;
+      const sv = d.querySelector(".sv"), del = d.querySelector(".del");
+      if (offlineTs) { sv.disabled = del.disabled = inp.disabled = true; }
+      sv.onclick = () => api(`/cameras/${encodeURIComponent(c.id)}/threshold`, { method: "PUT", body: JSON.stringify({ threshold: +inp.value }) }).then(refresh, err);
+      del.onclick = () => { if (c.brand === "phone") stopPhone(); api(`/cameras/${encodeURIComponent(c.id)}`, { method: "DELETE" }).then(refresh, err); };
+      $("list").appendChild(d);
+    });
+  }
+  const evEl = $("events"); evEl.innerHTML = "";
+  (ev || []).slice(0, 30).forEach(e => { const d = document.createElement("div"); d.className = "ev"; d.textContent = `${when(e.ts * 1000)} – ${e.label}: ${e.count} people`; evEl.appendChild(d); });
+  if (!ev || !ev.length) evEl.innerHTML = "<small>None yet</small>";
+}
+
+async function refresh() {
+  try {
+    const [s, e] = await Promise.all([api("/status"), api("/events")]);
+    $("offline").style.display = "none"; $("addcard").style.opacity = 1;
+    if (s.alarm && !(window.__lastAlarm)) notify(`${s.total} people detected`);
+    if (s.alarm) beep(); window.__lastAlarm = s.alarm;
+    draw(s, e.events, 0);
+    const snap = { ts: Date.now(), status: s, events: e.events };
+    lsSet("swarm_cache", snap);
+    try { window.webkit.messageHandlers.swarmCache.postMessage(JSON.stringify(snap)); } catch (x) {}
+    err("");
+    if (n++ % 10 === 0) api("/remote").then(r => { $("remote").innerHTML = ""; const sm = document.createElement("small");
+      sm.textContent = r.url ? "Remote link (anywhere, login required): " + r.url : (r.enabled ? "Remote access starting…" : "Remote access off (reinstall with SWARM_REMOTE=1 to enable)"); $("remote").appendChild(sm); }, () => {});
+  } catch (x) {
+    const c = lsGet("swarm_cache");
+    if (c && token) {
+      $("offline").style.display = "block"; $("offline").textContent = `OFFLINE – server unreachable. Showing last known state from ${when(c.ts)}. Retrying…`;
+      $("addcard").style.opacity = .4;
+      draw(c.status, c.events, c.ts); err("");
+    } else err(x);
+  }
+}
+$("go").onclick = async () => {
+  beep(); try { if (window.Notification && Notification.permission === "default") Notification.requestPermission(); } catch (e) {}
+  try {
+    const r = await fetch(`/login?username=${encodeURIComponent($("u").value)}&password=${encodeURIComponent($("p").value)}`, { method: "POST" });
+    const j = await r.json(); if (!r.ok) throw new Error(j.detail);
+    err(""); setToken(j.access_token);
+  } catch (e) { err(e); }
+};
+$("tts").onclick = () => api("/settings", { method: "PUT", body: JSON.stringify({ total_threshold: +$("tt").value }) }).then(refresh, err);
+$("add").onclick = () => {
+  const a = $("curl").value.trim(); if (!a) return err("Enter a camera address");
+  const id = $("cid").value.trim() || ("cam-" + a.replace(/[^a-z0-9]+/gi, "-").slice(0, 24));
+  api(`/cameras/${encodeURIComponent(id)}`, { method: "POST", body: JSON.stringify({ url: a, brand: $("brand").value, username: $("cu").value, password: $("cp").value, threshold: +$("thr").value }) })
+    .then(() => { err(""); $("curl").value = ""; $("cp").value = ""; refresh(); }, err);
+};
+$("scan").onclick = async () => {
+  $("found").textContent = "Scanning your network (about 10 s)…";
+  try {
+    const { devices } = await api("/discover");
+    $("found").innerHTML = devices.length ? "" : "No cameras found. Enter the address manually.";
+    devices.forEach(d => { const b = document.createElement("button"); b.className = "sec"; b.textContent = `Use ${d.ip} – ${d.hint}`; b.onclick = () => { $("curl").value = d.ip; $("cu").focus(); }; $("found").appendChild(b); });
+  } catch (e) { $("found").textContent = ""; err(e); }
+};
+function stopPhone() { clearInterval(phoneTimer); phoneTimer = null; const v = $("vid"); if (v.srcObject) v.srcObject.getTracks().forEach(t => t.stop()); v.srcObject = null; }
+$("phone").onclick = async () => {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return err("Browser camera needs HTTPS or localhost (use the Remote link, or install with SWARM_HTTPS=1).");
+  try {
+    stopPhone();
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } } });
+    const v = $("vid"); v.srcObject = stream; await v.play();
+    const id = "phone-" + Math.random().toString(36).slice(2, 6);
+    await api(`/cameras/${id}`, { method: "POST", body: JSON.stringify({ url: "phone", brand: "phone", threshold: +$("thr").value }) });
+    const cv = document.createElement("canvas");
+    phoneTimer = setInterval(() => {
+      cv.width = 640; cv.height = Math.round(640 * v.videoHeight / v.videoWidth) || 360;
+      cv.getContext("2d").drawImage(v, 0, 0, cv.width, cv.height);
+      cv.toBlob(b => b && api(`/cameras/${id}/frame`, { method: "POST", body: b, headers: { "Content-Type": "image/jpeg" } }).catch(() => {}), "image/jpeg", .7);
+    }, 1000);
+    err(""); refresh();
+  } catch (e) { err(e); }
+};
+$("out").onclick = () => { stopPhone(); setToken(null); };
+
+// install-to-home-screen
+const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; $("install").hidden = false; });
+$("install").onclick = async () => { if (installEvt) { installEvt.prompt(); installEvt = null; $("install").hidden = true; } };
+if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !standalone) $("ioshint").hidden = false;
+
+render();
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
 </body>
 </html>

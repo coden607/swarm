@@ -1,36 +1,55 @@
-# Swarm Detection Service
+# Swarm Detection
 
-## One‑Click Installation Guide
+Connect almost any camera, count people on each, and alert when a swarm forms - per camera or across all cameras combined. Manage everything from a dashboard that installs like an app on desktop, Android and iPhone.
 
-### Android
-- Use the **One‑Click Installer** page (`installer.html`). It detects Android and offers a button that installs **Termux** from F‑Droid and runs a bootstrap script (`setup_swarm.sh`) which sets up a proot Alpine distro, installs Docker, pulls the Swarm repo and runs `install.sh`.
+## One‑line install
 
-### iOS (iPhone / iPad)
-- iOS cannot run Docker locally. Instead, run the service on a reachable Linux host (your VPS, a desktop, or the Android Termux environment) and access the UI as a **Progressive Web App (PWA)**.
-- Open Safari on your iPhone and navigate to the URL provided by the installer page (e.g., `https://YOUR_HOST_DOMAIN_OR_IP`).
-- Tap **Share** → **Add to Home Screen**. This creates a one‑tap app icon that launches the Swarm UI.
-- The UI works offline after the first load and provides the same wizard for adding cameras of any brand.
+**Linux / macOS / Android (Termux)**
+```sh
+curl -fsSL https://raw.githubusercontent.com/coden607/swarm/main/install.sh | sh
+```
 
-### Desktop (Windows / macOS / Linux)
-- Click the **Download & Run Installer** button on the installer page. It downloads `install.sh`; make it executable (`chmod +x install.sh`) and run with `sudo`.
-- The script installs Docker, builds the container, sets up a `systemd` service, and generates a QR code for mobile access.
+**Windows (PowerShell)**
+```powershell
+irm https://raw.githubusercontent.com/coden607/swarm/main/install.ps1 | iex
+```
 
-### All Platforms
-- After installation, ensure port **8000** (or HTTPS 443 if you enable Caddy) is reachable from your mobile device.
-- The service automatically restarts on failure via the systemd watchdog.
+No Docker. The installer sets up Python + dependencies, creates `.env` (random admin password), starts an auto‑restarting service, puts a **Swarm Detection icon on your Desktop / app menu / Start Menu**, and prints the URL, login and a QR code.
 
----
+Add `SWARM_REMOTE=1` before the command to also get a public https link you can open from anywhere (login still required): `SWARM_REMOTE=1 curl -fsSL … | sh` / `$env:SWARM_REMOTE=1; irm … | iex`.
 
-For detailed troubleshooting, see the `android/README.md` and the **FAQ** section below.
+## Cameras it works with
+Type whatever you have in **Add camera**:
+- **Camera IP** (`192.168.1.20`) + optional user/password: auto‑tries ~40 common RTSP/HTTP paths (Hikvision, Dahua/Amcrest, Axis, Reolink, Tapo, Foscam, UniFi, generic ONVIF…), then asks the camera via ONVIF.
+- **Full URL**: `rtsp://…`, MJPEG `http://…/video.mjpg`, single‑image snapshot URLs (`…/snapshot.jpg`).
+- **USB webcam**: `0`. **Video file path**: for testing.
+- **A phone/tablet/laptop browser** ("Use this device's camera"): needs https, so use the remote link or `SWARM_HTTPS=1`.
+- **Scan network** finds ONVIF/RTSP devices automatically.
 
-A private repository that connects to arbitrary camera streams, detects swarms of people using the Gemini model, and triggers alerts (sound alarm or phone calls) when the number of people exceeds a configurable threshold.
+Cameras reconnect automatically and are remembered across restarts.
 
-## Features
-- Connect to any RTSP/HTTP camera URL.
-- Configurable swarm size threshold.
-- Gemini model (`gemini-pro`) for person count inference.
-- Alerts:
-  - Local alarm sound.
-  - Optional Twilio phone call notifications.
-- FastAPI HTTP API for managing cameras and thresholds.
-- Docker support.
+## Detection
+- **Offline (default):** built‑in OpenCV person detector. No internet, no key. Works for upright people at moderate distance; very dense crowds are under‑counted.
+- **Online:** add a Gemini key in `.env` for better accuracy; falls back to the offline detector automatically if the internet drops.
+- Per‑camera threshold plus a **combined swarm threshold** across all cameras. Alerts: red banner, browser beep + notification, server sound, optional email. History is kept.
+
+## Online and offline
+- **On your network (no internet needed):** open `http://<server-ip>:8000` from any device.
+- **From anywhere:** `SWARM_REMOTE=1` link (shown in the app), or use Tailscale.
+- **If the server is unreachable**, the app still opens (cached shell) and shows the last known cameras and alerts with an OFFLINE banner.
+
+## Apps
+- **Desktop icon:** created by the installer.
+- **Android / desktop Chrome/Edge:** open the URL → **Install app**.
+- **iPhone/iPad (PWA):** Safari → Share → Add to Home Screen.
+- **iPhone test app (native wrapper):** see [`ios/README.md`](ios/README.md).
+
+## Options (env vars)
+`SWARM_HOME` · `SWARM_PORT` · `GEMINI_API_KEY` · `SWARM_REMOTE=1` · `SWARM_HTTPS=1` · `SWARM_NO_START=1` · `SWARM_NO_SERVICE=1` · `SWARM_NO_ICON=1`
+Detector: `SWARM_DETECTOR=auto|local|gemini`, `GEMINI_MODEL`. Uninstall (Linux/macOS/Termux): `sh install.sh --uninstall`.
+Other `.env` keys: `ADMIN_USER`, `ADMIN_PASS`, `JWT_SECRET`, `EMAIL_SMTP_*`, `EMAIL_FROM`, `ONVIF_USER`/`ONVIF_PASS`.
+
+## API (Bearer token from `POST /login`)
+`GET /status` · `GET /events` · `GET/POST/DELETE /cameras[/{id}]` · `PUT /cameras/{id}/threshold` · `PUT /settings` · `GET /discover` · `GET /remote` · `POST /cameras/{id}/frame` · `GET /health`
+
+Camera passwords are stored in `data/cameras.json` (permissions 600). Keep `.env` and `data/` private.

@@ -5,66 +5,50 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Swarm Detection – One‑Click Installer</title>
   <style>
-    body {font-family: Arial, sans-serif; margin:0; padding:2rem; background:#f5f5f5;}
-    .container {max-width:600px;margin:auto;background:#fff;padding:2rem;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
-    h1 {text-align:center;}
-    button, a.button {display:block;width:100%;margin:1rem 0;padding:1rem;background:#2b8a3e;color:#fff;border:none;border-radius:4px;font-size:1rem;text-align:center;cursor:pointer; text-decoration:none;}
-    button:hover, a.button:hover {background:#267134;}
-    #msg {margin-top:1rem;color:#444;}
+    body{font-family:system-ui,Arial,sans-serif;margin:0;padding:1rem;background:#f5f5f5}
+    .c{max-width:640px;margin:auto;background:#fff;padding:1.5rem;border-radius:8px;box-shadow:0 2px 8px #0002}
+    h1{text-align:center;font-size:1.4rem}
+    pre{background:#111;color:#e6e6e6;padding:.75rem;border-radius:6px;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+    button{width:100%;padding:.8rem;background:#2b8a3e;color:#fff;border:0;border-radius:4px;font-size:1rem;cursor:pointer}
+    .hint{color:#555;font-size:.9rem}
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Swarm Detection – One‑Click Install</h1>
-    <p>This page detects your platform and triggers the appropriate installer with a single tap.</p>
-    <div id="actions"></div>
-    <div id="msg"></div>
-  </div>
-
-  <script>
-    const actionsDiv = document.getElementById('actions');
-    const msgDiv = document.getElementById('msg');
-    const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-
-    function createButton(label, href, onClick) {
-      const a = document.createElement('a');
-      a.className = 'button';
-      a.textContent = label;
-      if (href) a.href = href;
-      if (onClick) a.onclick = onClick;
-      return a;
-    }
-
-    if (/android/i.test(userAgent)) {
-      // Android – open Termux install page then run one‑liner via intent
-      const termuxLink = 'https://f-droid.org/packages/com.termux/';
-      const scriptUrl = 'https://raw.githubusercontent.com/your-org/swarm/main/android/setup_swarm.sh';
-      const runCmd = `bash -c "$(curl -fsSL ${scriptUrl})"`;
-      actionsDiv.appendChild(createButton('Install Termux (F‑Droid)', termuxLink));
-      actionsDiv.appendChild(createButton('Run Swarm Installer', '#', () => {
-        // Use the "intent:" scheme to open the terminal and paste the command
-        const intentUrl = `intent:#Intent;action=android.intent.action.VIEW;type=text/plain;S.android.intent.extra.TEXT=${encodeURIComponent(runCmd)};end`;
-        window.location = intentUrl;
-        msgDiv.textContent = 'If Termux is installed, the command will be pasted. Please press "Enter" in Termux.';
-      }));
-    } else if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
-      // iOS – direct user to the PWA UI (served by the Docker container once it’s up)
-      const uiUrl = 'https://YOUR_HOST_DOMAIN_OR_IP'; // replace with actual reachable host (HTTPS recommended)
-      actionsDiv.appendChild(createButton('Open Swarm UI (PWA)', uiUrl, () => {
-        msgDiv.textContent = 'Tap the Share button in Safari and select “Add to Home Screen” for a one‑tap app.';
-      }));
-    } else if (/Win|Mac|Linux/.test(userAgent)) {
-      // Desktop – download and execute the installer script (auto‑run on double‑click)
-      const scriptUrl = 'https://raw.githubusercontent.com/your-org/swarm/main/install.sh';
-      actionsDiv.appendChild(createButton('Download & Run Installer', scriptUrl, () => {
-        // For safety we just guide the user – they can double‑click after download
-        msgDiv.textContent = 'The installer script will be downloaded. Save it, make it executable (chmod +x), and run with sudo.';
-      }));
-    } else {
-      actionsDiv.appendChild(createButton('Manual Installation Guide', '#', () => {
-        msgDiv.textContent = 'Unsupported platform. Please refer to the README for manual steps.';
-      }));
-    }
-  </script>
+<div class="c">
+  <h1>Swarm Detection – One‑Click Install</h1>
+  <p class="hint" id="detected"></p>
+  <pre id="cmd"></pre>
+  <button id="copy">Copy command</button>
+  <p class="hint" id="steps"></p>
+  <hr />
+  <p class="hint">Other systems: <a href="#" data-os="unix">Linux / macOS / Termux</a> · <a href="#" data-os="win">Windows</a> · <a href="#" data-os="ios">iPhone / iPad</a></p>
+</div>
+<script>
+  const RAW = 'https://raw.githubusercontent.com/coden607/swarm/main';
+  const OS = {
+    unix: { name: 'Linux / macOS / Android (Termux)', cmd: `curl -fsSL ${RAW}/install.sh | sh`,
+      steps: 'Open a terminal (on Android: install Termux from F‑Droid first), paste, press Enter. Adds a desktop/app icon and prints the URL, login and QR code. Prefix with SWARM_REMOTE=1 for a public link.' },
+    win: { name: 'Windows', cmd: `irm ${RAW}/install.ps1 | iex`,
+      steps: 'Open PowerShell (Administrator recommended so the firewall port opens), paste, press Enter. Adds a Desktop and Start Menu icon.' },
+    ios: { name: 'iPhone / iPad', cmd: 'Install on a PC, Mac, Linux box or Android phone first, then open its URL (http://HOST_IP:8000) in Safari',
+      steps: 'Tap Share → Add to Home Screen. iOS cannot run the service itself; the app is a client. Native test app: see ios/README.md in the repo.' }
+  };
+  const ua = navigator.userAgent || '';
+  let key = /iPad|iPhone|iPod/.test(ua) ? 'ios' : /Win/.test(ua) ? 'win' : 'unix';
+  function show(k) {
+    const o = OS[k];
+    document.getElementById('detected').textContent = 'Detected / selected: ' + o.name;
+    document.getElementById('cmd').textContent = o.cmd;
+    document.getElementById('steps').textContent = o.steps;
+    document.getElementById('copy').hidden = k === 'ios';
+  }
+  document.querySelectorAll('[data-os]').forEach(a => a.onclick = e => { e.preventDefault(); show(a.dataset.os); });
+  document.getElementById('copy').onclick = () => {
+    navigator.clipboard.writeText(document.getElementById('cmd').textContent).then(
+      () => document.getElementById('copy').textContent = 'Copied ✔',
+      () => document.getElementById('copy').textContent = 'Select the text above and copy manually');
+  };
+  show(key);
+</script>
 </body>
 </html>

@@ -1,0 +1,27 @@
+name: Swarm
+options:
+  bundleIdPrefix: com.coden607
+  deploymentTarget:
+    iOS: "15.0"
+targets:
+  Swarm:
+    type: application
+    platform: iOS
+    sources: [Sources]
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: Swarm
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        NSLocalNetworkUsageDescription: Swarm connects to your Swarm server and cameras on the local network.
+        NSCameraUsageDescription: Optional - use this phone as a camera for swarm detection.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.coden607.swarm
+        SWIFT_VERSION: "5.0"
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1,2"

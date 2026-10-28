@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import cv2
 import logging
+import os
 import socket
 from urllib.parse import urlparse
 
@@ -10,7 +13,7 @@ try:
 except Exception:  # pragma: no cover
     ONVIF_AVAILABLE = False
 
-def _discover_onvif_rtsp(host: str) -> str | None:
+def _discover_onvif_rtsp(host: str, user: str | None = None, passwd: str | None = None) -> str | None:
     """Attempt to discover an ONVIF camera’s RTSP stream.
     Returns the RTSP URI or ``None`` if discovery fails.
     """
@@ -19,8 +22,8 @@ def _discover_onvif_rtsp(host: str) -> str | None:
     try:
         # The default ONVIF ports are 80 (HTTP) and 443 (HTTPS).
         # Users can supply credentials via environment variables if needed.
-        user = os.getenv("ONVIF_USER", "admin")
-        passwd = os.getenv("ONVIF_PASS", "admin")
+        user = user or os.getenv("ONVIF_USER", "admin")
+        passwd = passwd or os.getenv("ONVIF_PASS", "admin")
         cam = ONVIFCamera(host, 80, user, passwd)
         media_service = cam.create_media_service()
         profiles = media_service.GetProfiles()

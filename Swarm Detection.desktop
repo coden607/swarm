@@ -2,9 +2,9 @@
 Version=1.0
 Type=Application
 Name=Swarm Detection – One‑Click Installer
-Comment=Installs Docker, builds UI, starts service, and prints QR‑code
+Comment=Installs and starts Swarm Detection
 Icon=network-workgroup
-Exec=/usr/local/bin/swarm-install
+Exec=sh -c "curl -fsSL https://raw.githubusercontent.com/coden607/swarm/main/install.sh | sh; printf 'Press Enter to close'; read x"
 Terminal=true
 Categories=Utility;Network;
 StartupNotify=false
