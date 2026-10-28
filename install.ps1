@@ -128,8 +128,14 @@ catch { Warn "Firewall rule not added (run PowerShell as Administrator, or allow
 
 # 7. verify + report
 $up = $false
+$fell = $false
 for ($i = 0; $i -lt 40; $i++) {
   try { if ((Invoke-WebRequest "http://127.0.0.1:$Port/health" -UseBasicParsing -TimeoutSec 2).StatusCode -eq 200) { $up = $true; break } } catch {}
+  if ($i -ge 12 -and -not $fell) {
+    $fell = $true
+    Warn 'Scheduled task has not started the server yet; starting it directly.'
+    Start-Process cmd.exe -ArgumentList "/c `"$Home_\swarm.cmd`" >> `"$Home_\swarm.log`" 2>&1" -WindowStyle Hidden
+  }
   Start-Sleep 1
 }
 $ip = & $vpy -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.connect(('10.255.255.255',1)); print(s.getsockname()[0])" 2>$null
