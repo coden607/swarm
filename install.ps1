@@ -6,6 +6,7 @@ $ErrorActionPreference = 'Stop'
 $Repo = 'coden607/swarm'; $Branch = 'main'
 $Home_ = if ($env:SWARM_HOME) { $env:SWARM_HOME } else { Join-Path $env:USERPROFILE 'swarm' }
 $Port  = if ($env:SWARM_PORT) { $env:SWARM_PORT } else { '8000' }
+if ($PSScriptRoot -and (Test-Path (Join-Path $PSScriptRoot 'app\main.py'))) { $Home_ = $PSScriptRoot }
 function Log($m)  { Write-Host "[+] $m" -ForegroundColor Green }
 function Warn($m) { Write-Host "[!] $m" -ForegroundColor Yellow }
 
@@ -145,5 +146,6 @@ if (-not $up) { foreach ($lf in 'swarm.log','swarm.err.log') { if (Test-Path "$H
 Log "Swarm is running: http://${ip}:$Port   (this PC: http://127.0.0.1:$Port)"
 if ($newPass) { Write-Host "`n  Login:    admin`n  Password: $newPass      (saved in $Home_\.env)`n" }
 if ($remote) { Write-Host "  Remote link (anywhere, login required) appears in the app within ~20 s, or see $Home_\data\tunnel.log" }
+if ($env:SWARM_NO_OPEN -ne '1') { Start-Process -FilePath (Join-Path $Home_ 'swarm-open.cmd') -WindowStyle Hidden }
 Write-Host '  Phones: open the URL, then Share / menu -> Add to Home Screen (or Install app).'
 Write-Host '  Works offline on your local network; the app caches the last alerts if the server is unreachable.'

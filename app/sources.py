@@ -32,6 +32,12 @@ RTSP_PATHS = [
     ("unifi", "live/ch0"), ("foscam", "videoMain"), ("generic", "live"),
     ("generic", "live/main"), ("generic", "h264"), ("generic", "stream"), ("generic", "1"), ("generic", "11"),
     ("generic", "cam1/h264"), ("generic", "onvif1"), ("generic", "MediaInput/h264"), ("generic", "av0_0"), ("generic", ""),
+    ("hikvision", "ISAPI/Streaming/channels/101"), ("hikvision", "Streaming/Channels/102"),
+    ("reolink", "h264Preview_01_sub"), ("foscam", "videoSub"), ("foscam", "live/ch00_0"),
+    ("samsung", "profile1/media.smp"), ("samsung", "onvif/profile2/media.smp"), ("vivotek", "live.sdp"), ("vivotek", "live1s1.sdp"),
+    ("xmeye", "user={u}&password={p}&channel=1&stream=0.sdp?real_stream"), ("xmeye", "ch01/0"),
+    ("generic", "stream/main"), ("generic", "stream0"), ("generic", "video1"), ("generic", "play1.sdp"), ("generic", "ch0_0.h264"),
+    ("generic", "mpeg4/media.amp"), ("generic", "live/ch00_1"), ("generic", "0/onvif/profile1/media.smp"),
 ]
 HTTP_PATHS = [
     "video.mjpg", "mjpg/video.mjpg", "videostream.cgi", "video", "stream.mjpg", "mjpeg", "?action=stream",
@@ -64,7 +70,8 @@ def candidates(addr: str, user: str = "", pw: str = "", brand: str = "generic") 
         port = int(ps) if ps.isdigit() else None
     rt = sorted(RTSP_PATHS, key=lambda t: t[0] != brand)  # stable: chosen brand first
     if "rtsp" in schemes:
-        out += [f"rtsp://{cred}{host}:{port or 554}/{path}" for _, path in rt]
+        out += [f"rtsp://{cred}{host}:{port or 554}/" + path.replace("{u}", quote(user, safe="")).replace("{p}", quote(pw, safe=""))
+                for _, path in rt]
     if "http" in schemes:
         for hp_ in ([port] if port else [80, 8080]):
             out += [f"http://{cred}{host}:{hp_}/{path}" for path in HTTP_PATHS]

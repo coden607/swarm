@@ -376,6 +376,10 @@ if [ "$UP" = 1 ]; then
   echo "  Phones: open the URL, then Share / menu -> Add to Home Screen (or 'Install app')."
   echo "  Works offline on your local network; the app also caches the last alerts if the server is unreachable."
   echo "  Make sure port $PORT is allowed through your firewall."
+  if [ "${SWARM_NO_OPEN:-0}" != 1 ] && { [ "$OS" = Darwin ] || [ "$TERMUX" = 1 ] || [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; }; then
+    log "Opening the dashboard..."
+    nohup "$SWARM_HOME/swarm-open" >/dev/null 2>&1 &
+  fi
 else
   die "Installed but the server did not answer on port $PORT. Check $SWARM_HOME/swarm.log (or: journalctl --user -u swarm)."
 fi

@@ -109,6 +109,9 @@ function when(ts) { return new Date(ts).toLocaleString(); }
 
 async function render() {
   clearInterval(tick);
+  if (!token) { // browser on the server machine itself: sign in automatically
+    try { const r = await fetch("/local-token"); if (r.ok) { token = (await r.json()).access_token; try { localStorage.setItem("swarm_token", token); } catch (e) {} } } catch (e) {}
+  }
   $("login").hidden = !!token; $("app").hidden = !token;
   if (!token) return;
   await refresh(); tick = setInterval(refresh, 2000);
@@ -139,6 +142,7 @@ function draw(s, ev, offlineTs) {
       $("list").appendChild(d);
     });
   }
+  if (!s.cameras.length && !offlineTs && !window.__scanned) { window.__scanned = true; $("scan").click(); }
   const evEl = $("events"); evEl.innerHTML = "";
   (ev || []).slice(0, 30).forEach(e => { const d = document.createElement("div"); d.className = "ev"; d.textContent = `${when(e.ts * 1000)} – ${e.label}: ${e.count} people`; evEl.appendChild(d); });
   if (!ev || !ev.length) evEl.innerHTML = "<small>None yet</small>";

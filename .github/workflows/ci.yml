@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: One-line installer from local checkout
-        run: SWARM_NO_SERVICE=1 SWARM_PORT=8123 GEMINI_API_KEY= sh ./install.sh
+        run: SWARM_NO_OPEN=1 SWARM_NO_SERVICE=1 SWARM_PORT=8123 GEMINI_API_KEY= sh ./install.sh
       - name: Health
         run: curl -fsS http://127.0.0.1:8123/health
       - name: Icon helpers exist
@@ -37,6 +37,7 @@ jobs:
         env:
           SWARM_HOME: ${{ github.workspace }}
           SWARM_PORT: "8123"
+          SWARM_NO_OPEN: "1"
           GEMINI_API_KEY: "ci-placeholder"
         run: ./install.ps1
       - name: Health

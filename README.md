@@ -2,6 +2,17 @@
 
 Connect almost any camera, count people on each, and alert when a swarm forms - per camera or across all cameras combined. Manage everything from a dashboard that installs like an app on desktop, Android and iPhone.
 
+## Single click
+Download one file, double‑click it, done (it installs, adds a desktop icon, starts the service and opens the dashboard already signed in):
+- **Windows:** [Install-Windows.bat](https://github.com/coden607/swarm/raw/main/Install-Windows.bat)
+- **macOS:** [Install-Mac.command](https://github.com/coden607/swarm/raw/main/Install-Mac.command) (first time: right‑click → Open)
+- **Linux:** [Install-Linux.sh](https://github.com/coden607/swarm/raw/main/Install-Linux.sh)
+- **Android:** install Termux from F‑Droid, then run the one‑liner below (Android doesn't allow a no‑step install). Or just open a server's URL in Chrome → **Install app**.
+- **iPhone/iPad:** open the server's URL in Safari → Share → Add to Home Screen (or the native test app in `ios/`).
+
+On first open with no cameras it scans your network automatically; tap a result, add the camera's login if it has one, and you're counting.
+Cloud‑only cameras (Ring, Nest, Blink, Arlo without RTSP) can't be read by any local system; use the phone camera mode or a camera with RTSP/ONVIF.
+
 ## One‑line install
 
 **Linux / macOS / Android (Termux)**
