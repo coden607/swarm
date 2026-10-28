@@ -8,7 +8,7 @@ Download one file, double‑click it, done (it installs, adds a desktop icon, st
 - **macOS:** [Install-Mac.command](https://github.com/coden607/swarm/raw/main/Install-Mac.command) (first time: right‑click → Open)
 - **Linux:** [Install-Linux.sh](https://github.com/coden607/swarm/raw/main/Install-Linux.sh)
 - **Android:** install Termux from F‑Droid, then run the one‑liner below (Android doesn't allow a no‑step install). Or just open a server's URL in Chrome → **Install app**.
-- **iPhone/iPad:** open the server's URL in Safari → Share → Add to Home Screen (or the native test app in `ios/`).
+- **iPhone/iPad:** works as a viewer/controller of the server (live camera view, alerts, add cameras). Open the server's **https** link in Safari → Share → Add to Home Screen → open it from the Home Screen → **Enable alerts on this device** for push notifications (iOS 16.4+). Native test app in `ios/`.
 
 On first open with no cameras it scans your network automatically; tap a result, add the camera's login if it has one, and you're counting.
 Cloud‑only cameras (Ring, Nest, Blink, Arlo without RTSP) can't be read by any local system; use the phone camera mode or a camera with RTSP/ONVIF.

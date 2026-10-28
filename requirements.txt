@@ -8,3 +8,4 @@ pydub
 audioop-lts; python_version >= "3.13"
 pyjwt
 onvif-zeep
+pywebpush

@@ -19,17 +19,22 @@ class HogCounter:
     def __init__(self):
         self.h = cv2.HOGDescriptor()
         self.h.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+        self.boxes = []  # last detections, in original-frame pixels
 
     def count(self, frame) -> int:
         w = frame.shape[1]
-        if w > 960:
-            frame = cv2.resize(frame, None, fx=960 / w, fy=960 / w)
+        k = 960 / w if w > 960 else 1.0
+        if k != 1.0:
+            frame = cv2.resize(frame, None, fx=k, fy=k)
+        self.boxes = []
         rects, weights = self.h.detectMultiScale(frame, winStride=(8, 8), padding=(8, 8), scale=1.05)
         if len(rects) == 0:
             return 0
         boxes = [[int(x), int(y), int(a), int(b)] for x, y, a, b in rects]
         keep = cv2.dnn.NMSBoxes(boxes, [float(s) for s in np.ravel(weights)], 0.3, 0.4)
-        return int(len(np.array(keep).flatten())) if len(keep) else 0
+        idx = np.array(keep).flatten() if len(keep) else []
+        self.boxes = [tuple(int(v / k) for v in boxes[i]) for i in idx]
+        return int(len(idx))
 
 
 class GeminiCounter:
@@ -73,10 +78,19 @@ class Counter:
     def interval(self) -> float:
         return 2.0 if self.remote else 1.0
 
+    @property
+    def boxes(self):
+        return self.local.boxes if not self._used_remote else []
+
+    _used_remote = False
+
     def count(self, frame) -> int:
+        self._used_remote = False
         if self.remote and time.time() >= self.skip_until:
             try:
-                return self.remote.count(frame)
+                n = self.remote.count(frame)
+                self._used_remote = True
+                return n
             except Exception as e:
                 print(f"[detector] Gemini error ({e}); local fallback for 30s")
                 self.skip_until = time.time() + 30
@@ -98,6 +112,8 @@ class CameraProcessor:
         self.last_alert = 0.0
         self.resolved = ""
         self.status = "starting"
+        self.frame = None   # latest frame, for live view
+        self.boxes = []
 
     # -- public view
     url = property(lambda s: s.spec["url"])
@@ -114,6 +130,22 @@ class CameraProcessor:
     @property
     def alarm(self) -> bool:
         return self.fresh() and self.count >= self.threshold
+
+    def snapshot_jpeg(self, width: int = 640):
+        """Latest frame with detection boxes and count drawn on it (for the live view)."""
+        f = self.frame
+        if f is None:
+            return None
+        k = width / f.shape[1] if f.shape[1] > width else 1.0
+        img = cv2.resize(f, None, fx=k, fy=k) if k != 1.0 else f.copy()
+        red = self.alarm
+        for x, y, w, h in self.boxes:
+            cv2.rectangle(img, (int(x * k), int(y * k)), (int((x + w) * k), int((y + h) * k)), (60, 60, 255) if red else (80, 200, 80), 2)
+        label = f"{self.id}: {self.count if self.fresh() else '-'}"
+        cv2.putText(img, label, (8, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 4, cv2.LINE_AA)
+        cv2.putText(img, label, (8, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 1, cv2.LINE_AA)
+        ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 70])
+        return buf.tobytes() if ok else None
 
     def push_frame(self, jpeg: bytes) -> bool:
         if not self.push:
@@ -163,6 +195,7 @@ class CameraProcessor:
                         break
                     continue
                 last_ok = time.time()
+                self.frame = frame
                 if last_ok - last_inf < self.counter.interval:
                     continue
                 last_inf = last_ok
@@ -171,7 +204,7 @@ class CameraProcessor:
                 except Exception as e:
                     self.status = f"error: {e}"
                     continue
-                self.count, self.updated = n, time.time()
+                self.count, self.updated, self.boxes = n, time.time(), list(self.counter.boxes)
                 self.status = f"running ({self.counter.name})"
                 if self.on_count:
                     self.on_count(self)

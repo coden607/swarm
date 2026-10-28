@@ -28,6 +28,7 @@
   #offline{display:none;text-align:center;font-weight:600}
   .ev{font-size:.9rem;padding:.2rem 0;border-bottom:1px solid #eee}
   video{display:none}
+  img.live{width:100%;border-radius:6px;margin:.4rem 0;background:#000;min-height:40px}
 </style>
 </head>
 <body>
@@ -73,6 +74,8 @@
 
     <div class="card">
       <div id="remote"><small>Remote access: checking…</small></div>
+      <button id="pushbtn" class="sec">Enable alerts on this device</button>
+      <small id="pushmsg"></small>
       <button id="install" class="sec" hidden>Install app on this device</button>
       <small id="ioshint" hidden>iPhone/iPad: tap <b>Share</b> → <b>Add to Home Screen</b>.</small>
     </div>
@@ -82,6 +85,7 @@
 <video id="vid" playsinline muted></video>
 <script>
 const $ = id => document.getElementById(id);
+const thumbs = {};
 let token = null, audio = null, phoneTimer = null, tick = null, n = 0, installEvt = null;
 try { token = localStorage.getItem("swarm_token"); } catch (e) {}
 const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
@@ -128,10 +132,11 @@ function draw(s, ev, offlineTs) {
     $("list").innerHTML = "";
     s.cameras.forEach(c => {
       const d = document.createElement("div"); d.className = "card" + (c.alarm && !offlineTs ? " alarm" : "");
-      d.innerHTML = `<div class="row"><b></b><span class="count" style="text-align:right"></span></div><small class="u"></small><br><small class="st"></small>
+      d.innerHTML = `<div class="row"><b></b><span class="count" style="text-align:right"></span></div><img class="live" alt=""><small class="u"></small><br><small class="st"></small>
         <div class="row"><input type="number" min="1" title="Alert threshold"><button class="sv">Save threshold</button><button class="del">Remove</button></div>`;
       d.querySelector("b").textContent = `${c.id} (${c.brand})`;
       d.querySelector(".count").textContent = c.count === null ? "–" : c.count;
+      const im = d.querySelector("img.live"); im.dataset.id = c.id; if (thumbs[c.id]) im.src = thumbs[c.id]; else im.style.display = "none";
       d.querySelector(".u").textContent = c.resolved || c.url;
       d.querySelector(".st").textContent = c.status;
       const inp = d.querySelector("input"); inp.value = c.threshold;
@@ -148,6 +153,17 @@ function draw(s, ev, offlineTs) {
   if (!ev || !ev.length) evEl.innerHTML = "<small>None yet</small>";
 }
 
+async function refreshThumbs(cams) {
+  for (const c of cams) {
+    try {
+      const r = await fetch(`/cameras/${encodeURIComponent(c.id)}/snapshot`, { headers: { Authorization: "Bearer " + token } });
+      if (!r.ok) continue;
+      const url = URL.createObjectURL(await r.blob()), old = thumbs[c.id]; thumbs[c.id] = url;
+      document.querySelectorAll(`img.live[data-id="${CSS.escape(c.id)}"]`).forEach(im => { im.src = url; im.style.display = ""; });
+      if (old) URL.revokeObjectURL(old);
+    } catch (x) {}
+  }
+}
 async function refresh() {
   try {
     const [s, e] = await Promise.all([api("/status"), api("/events")]);
@@ -155,6 +171,7 @@ async function refresh() {
     if (s.alarm && !(window.__lastAlarm)) notify(`${s.total} people detected`);
     if (s.alarm) beep(); window.__lastAlarm = s.alarm;
     draw(s, e.events, 0);
+    refreshThumbs(s.cameras);
     const snap = { ts: Date.now(), status: s, events: e.events };
     lsSet("swarm_cache", snap);
     try { window.webkit.messageHandlers.swarmCache.postMessage(JSON.stringify(snap)); } catch (x) {}
@@ -212,6 +229,21 @@ $("phone").onclick = async () => {
   } catch (e) { err(e); }
 };
 $("out").onclick = () => { stopPhone(); setToken(null); };
+
+// phone push alerts (iPhone: needs the https link + app added to Home Screen)
+function b64(k) { const p = "=".repeat((4 - k.length % 4) % 4), r = atob((k + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from([...r].map(c => c.charCodeAt(0))); }
+$("pushbtn").onclick = async () => {
+  const m = $("pushmsg");
+  if (!window.isSecureContext) return m.textContent = "Alerts need https: open the Remote link (or install with SWARM_HTTPS=1).";
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return m.textContent = "On iPhone: tap Share → Add to Home Screen, then open Swarm from the Home Screen and try again.";
+  try {
+    if (await Notification.requestPermission() !== "granted") return m.textContent = "Notifications were not allowed.";
+    const reg = await navigator.serviceWorker.ready, { key } = await api("/push/key");
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(key) });
+    await api("/push/subscribe", { method: "POST", body: JSON.stringify(sub.toJSON()) });
+    m.textContent = "Alerts enabled on this device ✔";
+  } catch (x) { m.textContent = "Could not enable alerts: " + (x.message || x); }
+};
 
 // install-to-home-screen
 const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone;
