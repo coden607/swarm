@@ -140,7 +140,7 @@ for ($i = 0; $i -lt 40; $i++) {
 }
 $ip = & $vpy -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.connect(('10.255.255.255',1)); print(s.getsockname()[0])" 2>$null
 if (-not $ip) { $ip = '127.0.0.1' }
-if (-not $up) { throw "Installed but server did not answer on port $Port. See $Home_\swarm.log" }
+if (-not $up) { if (Test-Path "$Home_\swarm.log") { Write-Host '--- swarm.log (last 40 lines) ---'; Get-Content "$Home_\swarm.log" -Tail 40 }; throw "Installed but server did not answer on port $Port. See $Home_\swarm.log" }
 Log "Swarm is running: http://${ip}:$Port   (this PC: http://127.0.0.1:$Port)"
 if ($newPass) { Write-Host "`n  Login:    admin`n  Password: $newPass      (saved in $Home_\.env)`n" }
 if ($remote) { Write-Host "  Remote link (anywhere, login required) appears in the app within ~20 s, or see $Home_\data\tunnel.log" }
