@@ -1,10 +1,10 @@
 fastapi
 uvicorn[standard]
-opencv-python-headless
+opencv-python-headless>=4.8,<5
+numpy<3
 google-generativeai
 python-dotenv
 pydub
+audioop-lts; python_version >= "3.13"
 pyjwt
-fastapi-jwt-auth
 onvif-zeep
-hikvisionapi

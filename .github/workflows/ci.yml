@@ -1,0 +1,51 @@
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -r requirements.txt pytest httpx
+      - run: python -m pytest -q
+  install-unix:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: One-line installer from local checkout
+        run: SWARM_NO_SERVICE=1 SWARM_PORT=8123 GEMINI_API_KEY= sh ./install.sh
+      - name: Health
+        run: curl -fsS http://127.0.0.1:8123/health
+      - name: Icon helpers exist
+        run: test -x swarm-open && test -f ui/icon-512.png
+  install-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install.ps1
+        shell: powershell
+        env:
+          SWARM_HOME: ${{ github.workspace }}
+          SWARM_PORT: "8123"
+          GEMINI_API_KEY: "ci-placeholder"
+        run: ./install.ps1
+      - name: Health
+        shell: powershell
+        run: (Invoke-WebRequest http://127.0.0.1:8123/health -UseBasicParsing).StatusCode
+  ios-build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install xcodegen
+      - run: cd ios && xcodegen
+      - run: cd ios && xcodebuild -project Swarm.xcodeproj -scheme Swarm -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build

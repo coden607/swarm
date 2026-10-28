@@ -3,3 +3,9 @@ venv/
 *.pyc
 *.pyo
 *.env
+.env
+data/
+swarm.log
+swarm.pid
+.requirements.termux
+.pytest_cache/
