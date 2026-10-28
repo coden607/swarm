@@ -18,6 +18,7 @@
   <h1>Swarm Detection – One‑Click Install</h1>
   <p class="hint" id="detected"></p>
   <pre id="cmd"></pre>
+  <a id="termux" href="https://f-droid.org/packages/com.termux/" style="display:none;margin:.5rem 0;text-align:center" class="hint"><b>Step 1 – Get Termux (F‑Droid)</b></a>
   <button id="copy">Copy command</button>
   <p class="hint">Or download and double‑click:
     <a href="https://github.com/coden607/swarm/raw/main/Install-Windows.bat">Windows</a> ·
@@ -25,26 +26,29 @@
     <a href="https://github.com/coden607/swarm/raw/main/Install-Linux.sh">Linux</a></p>
   <p class="hint" id="steps"></p>
   <hr />
-  <p class="hint">Other systems: <a href="#" data-os="unix">Linux / macOS / Termux</a> · <a href="#" data-os="win">Windows</a> · <a href="#" data-os="ios">iPhone / iPad</a></p>
+  <p class="hint">Other systems: <a href="#" data-os="unix">Linux / macOS</a> · <a href="#" data-os="android">Android</a> · <a href="#" data-os="win">Windows</a> · <a href="#" data-os="ios">iPhone / iPad</a></p>
 </div>
 <script>
   const RAW = 'https://raw.githubusercontent.com/coden607/swarm/main';
   const OS = {
     unix: { name: 'Linux / macOS / Android (Termux)', cmd: `curl -fsSL ${RAW}/install.sh | sh`,
       steps: 'Open a terminal (on Android: install Termux from F‑Droid first), paste, press Enter. Adds a desktop/app icon and prints the URL, login and QR code. Prefix with SWARM_REMOTE=1 for a public link.' },
+    android: { name: 'Android', cmd: `pkg install -y curl && curl -fsSL ${RAW}/install.sh | sh`,
+      steps: '1) Install Termux from F‑Droid (button above; not the Play Store version). 2) Open Termux, paste the command, press Enter. 3) Open the printed address in Chrome → menu → Install app. If another computer/Pi already runs Swarm, skip Termux: just open its https link in Chrome → Install app → Enable alerts.' },
     win: { name: 'Windows', cmd: `irm ${RAW}/install.ps1 | iex`,
       steps: 'Open PowerShell (Administrator recommended so the firewall port opens), paste, press Enter. Adds a Desktop and Start Menu icon.' },
     ios: { name: 'iPhone / iPad', cmd: 'Install on a PC, Mac, Linux box or Android phone first, then open its URL (http://HOST_IP:8000) in Safari',
       steps: 'Tap Share → Add to Home Screen. iOS cannot run the service itself; the app is a client. Native test app: see ios/README.md in the repo.' }
   };
   const ua = navigator.userAgent || '';
-  let key = /iPad|iPhone|iPod/.test(ua) ? 'ios' : /Win/.test(ua) ? 'win' : 'unix';
+  let key = /iPad|iPhone|iPod/.test(ua) ? 'ios' : /Android/.test(ua) ? 'android' : /Win/.test(ua) ? 'win' : 'unix';
   function show(k) {
     const o = OS[k];
     document.getElementById('detected').textContent = 'Detected / selected: ' + o.name;
     document.getElementById('cmd').textContent = o.cmd;
     document.getElementById('steps').textContent = o.steps;
     document.getElementById('copy').hidden = k === 'ios';
+    document.getElementById('termux').style.display = k === 'android' ? 'block' : 'none';
   }
   document.querySelectorAll('[data-os]').forEach(a => a.onclick = e => { e.preventDefault(); show(a.dataset.os); });
   document.getElementById('copy').onclick = () => {
