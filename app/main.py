@@ -12,7 +12,7 @@ from typing import Dict, List
 
 import jwt
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 
-from . import events  # noqa: E402
+from . import events, push  # noqa: E402
 from .alert import trigger_alert  # noqa: E402
 from .detector import COOLDOWN, CameraProcessor  # noqa: E402
 from .health import health_check  # noqa: E402
@@ -262,6 +262,33 @@ def status(_: str = Depends(require_auth)):
         "total_alarm": total_alarm(),
         "alarm": total_alarm() or any(p.alarm for p in cameras.values()),
     }
+
+
+@app.get("/cameras/{camera_id}/snapshot")
+def snapshot(camera_id: str, _: str = Depends(require_auth)):
+    p = cameras.get(camera_id)
+    if not p:
+        raise HTTPException(status_code=404, detail="Camera not found")
+    jpg = p.snapshot_jpeg()
+    if jpg is None:
+        raise HTTPException(status_code=404, detail="No frame yet")
+    return Response(jpg, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+
+
+@app.get("/push/key")
+def push_key(_: str = Depends(require_auth)):
+    try:
+        return {"key": push.public_key()}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Push unavailable: {e}")
+
+
+@app.post("/push/subscribe")
+def push_subscribe(sub: dict, _: str = Depends(require_auth)):
+    if not sub.get("endpoint") or "keys" not in sub:
+        raise HTTPException(status_code=400, detail="Bad subscription")
+    push.add(sub)
+    return {"ok": True, "devices": len(push.subscriptions())}
 
 
 @app.get("/events")

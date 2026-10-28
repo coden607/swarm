@@ -126,6 +126,30 @@ def test_xmeye_template_gets_credentials():
     assert any("user=admin&password=pw" in u for u in candidates("10.0.0.9", "admin", "pw"))
 
 
+def test_live_snapshot(client, snapshot_server):
+    client.post("/cameras/live", json={"url": f"127.0.0.1:{snapshot_server}", "threshold": 99})
+    r = wait(lambda: (lambda x: x if x.status_code == 200 else None)(client.get("/cameras/live/snapshot")), 60)
+    assert r and r.headers["content-type"] == "image/jpeg" and r.content[:2] == b"\xff\xd8"
+    assert client.get("/cameras/nope/snapshot").status_code == 404
+    client.delete("/cameras/live")
+
+
+def test_push_subscribe_and_send(client, monkeypatch):
+    pytest.importorskip("pywebpush")
+    k = client.get("/push/key").json()["key"]
+    assert len(k) > 80                                             # uncompressed P-256 point, base64url
+    sub = {"endpoint": "https://push.example/abc", "keys": {"p256dh": "x", "auth": "y"}}
+    assert client.post("/push/subscribe", json=sub).json()["devices"] == 1
+    assert client.post("/push/subscribe", json=sub).json()["devices"] == 1   # deduped
+    assert client.post("/push/subscribe", json={"endpoint": "x"}).status_code == 400
+    import pywebpush
+    from app import push
+    sent = []
+    monkeypatch.setattr(pywebpush, "webpush", lambda info, data, **kw: sent.append((info["endpoint"], data)))
+    push.send_all("Swarm alert", "7 people")
+    assert sent and sent[0][0] == sub["endpoint"] and "7 people" in sent[0][1]
+
+
 def test_events_and_remote(client):
     ev = client.get("/events").json()["events"]
     assert ev and ev[0]["count"] >= 5                      # alarms were logged

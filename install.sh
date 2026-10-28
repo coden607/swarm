@@ -116,7 +116,7 @@ if [ "$TERMUX" = 1 ]; then
   log "Termux: installing opencv + numpy via pkg"
   pkg install -y opencv-python python-numpy || warn "pkg opencv install failed"
   VENV_ARGS="--system-site-packages"
-  grep -vE '^(opencv|numpy)' requirements.txt > .requirements.termux || true
+  grep -vE '^(opencv|numpy|pywebpush)' requirements.txt > .requirements.termux || true
   REQ=".requirements.termux"
 fi
 
@@ -128,6 +128,7 @@ fi
 log "Installing Python dependencies (first run takes a few minutes)"
 venv/bin/python -m pip install -q --upgrade pip
 venv/bin/python -m pip install -q -r "$REQ"
+if [ "$TERMUX" = 1 ]; then venv/bin/python -m pip install -q pywebpush >/dev/null 2>&1 || warn "phone push alerts unavailable on this device (pywebpush failed to build)"; fi
 venv/bin/python -m pip install -q qrcode >/dev/null 2>&1 || true   # optional, for QR output
 
 LAN_IP="$(venv/bin/python -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.connect(('10.255.255.255', 1)); print(s.getsockname()[0])" 2>/dev/null || echo 127.0.0.1)"

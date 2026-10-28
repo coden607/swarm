@@ -7,7 +7,7 @@ from email.message import EmailMessage
 from pathlib import Path
 from typing import List
 
-from . import events
+from . import events, push
 
 _ROOT = Path(__file__).resolve().parent.parent
 _DATA = Path(os.getenv("SWARM_DATA_DIR", _ROOT / "data"))
@@ -69,6 +69,7 @@ def trigger_alert(count: int, email_addresses: List[str], label: str = "") -> No
     msg = f"Swarm alert{' on ' + label if label else ''}: {count} people detected."
     print(f"[alert] {msg}")
     events.add(label, count)
+    push.send_async("Swarm alert", msg)
     if os.getenv("SWARM_SERVER_SOUND", "1") == "1":
         subprocess.Popen([sys.executable, "-c", "import app.alert as a; a.play_alarm()"], cwd=str(_ROOT))
     if email_addresses:
