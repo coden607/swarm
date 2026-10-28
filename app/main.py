@@ -179,6 +179,17 @@ def login(request: Request, username: str, password: str):
     return {"access_token": token}
 
 
+@app.get("/local-token")
+def local_token(request: Request):
+    """Auto sign-in for a browser running on the server machine itself (never via LAN/tunnel)."""
+    host = request.client.host if request.client else ""
+    proxied = any(h in request.headers for h in ("cf-connecting-ip", "x-forwarded-for", "x-real-ip", "forwarded"))
+    if host not in ("127.0.0.1", "::1") or proxied:
+        raise HTTPException(status_code=403, detail="local only")
+    token = jwt.encode({"sub": ADMIN_USER, "exp": int(time.time()) + TOKEN_TTL}, JWT_SECRET, algorithm="HS256")
+    return {"access_token": token}
+
+
 @app.get("/health")
 def health():
     return health_check()

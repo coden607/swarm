@@ -112,6 +112,20 @@ def test_phone_camera_and_combined_threshold(client, jpeg):
     assert client.post("/cameras/snap/frame", content=jpeg).status_code == 400
 
 
+def test_local_auto_login(client):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    assert client.get("/local-token").status_code == 403                      # LAN-style client
+    with TestClient(app, client=("127.0.0.1", 5000)) as local:
+        assert local.get("/local-token").status_code == 200
+        assert local.get("/local-token", headers={"cf-connecting-ip": "1.2.3.4"}).status_code == 403  # via tunnel
+
+
+def test_xmeye_template_gets_credentials():
+    from app.sources import candidates
+    assert any("user=admin&password=pw" in u for u in candidates("10.0.0.9", "admin", "pw"))
+
+
 def test_events_and_remote(client):
     ev = client.get("/events").json()["events"]
     assert ev and ev[0]["count"] >= 5                      # alarms were logged
