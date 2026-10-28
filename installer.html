@@ -35,7 +35,7 @@
     win: { name: 'Windows', cmd: `irm ${RAW}/install.ps1 | iex`,
       steps: 'Open PowerShell (Administrator recommended so the firewall port opens), paste, press Enter. Adds a Desktop and Start Menu icon.' },
     ios: { name: 'iPhone / iPad', cmd: 'Install on a PC, Mac, Linux box or Android phone first, then open its URL (http://HOST_IP:8000) in Safari',
-      steps: 'Tap Share → Add to Home Screen. iOS cannot run the service itself; the app is a client. Native test app: see ios/README.md in the repo.' }
+      steps: 'Tap Share → Add to Home Screen, then Enable alerts (needs the https link, iOS 16.4+). iOS cannot run the service itself; the app is a client. Native app (sideload .ipa or Xcode): see ios/README.md in the repo.' }
   };
   const ua = navigator.userAgent || '';
   let key = /iPad|iPhone|iPod/.test(ua) ? 'ios' : /Win/.test(ua) ? 'win' : 'unix';
