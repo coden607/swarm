@@ -17,6 +17,18 @@ import android.webkit.WebViewClient;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
+import android.widget.Toast;
+import java.net.HttpURLConnection;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.URL;
+import java.util.Collections;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends Activity {
     private WebView web;
@@ -59,7 +71,7 @@ public class MainActivity extends Activity {
         setContentView(root);
 
         String server = prefs.getString("server", "");
-        if (server.isEmpty()) ask(); else web.loadUrl(server);
+        if (server.isEmpty()) discover(); else web.loadUrl(server);
     }
 
     private void ask() {
@@ -70,6 +82,7 @@ public class MainActivity extends Activity {
             .setTitle("Swarm server address")
             .setView(in)
             .setCancelable(false)
+            .setNeutralButton("Find automatically", (d, w) -> discover())
             .setPositiveButton("Connect", (d, w) -> {
                 String v = in.getText().toString().trim();
                 if (v.isEmpty()) return;
@@ -78,6 +91,57 @@ public class MainActivity extends Activity {
                 web.loadUrl(v);
             })
             .show();
+    }
+
+    /** Finds a Swarm server with no typing: this phone (Termux) first, then the Wi-Fi network (port 8000). */
+    private void discover() {
+        Toast.makeText(this, "Looking for your Swarm server...", Toast.LENGTH_LONG).show();
+        new Thread(() -> {
+            String found = probe("http://127.0.0.1:8000");
+            if (found == null) found = scanLan();
+            final String f = found;
+            runOnUiThread(() -> {
+                if (f != null) { prefs.edit().putString("server", f).apply(); web.loadUrl(f); }
+                else { Toast.makeText(this, "No Swarm server found on this network.", Toast.LENGTH_LONG).show(); ask(); }
+            });
+        }).start();
+    }
+
+    private static String probe(String base) {
+        try {
+            HttpURLConnection c = (HttpURLConnection) new URL(base + "/health").openConnection();
+            c.setConnectTimeout(700); c.setReadTimeout(1200);
+            if (c.getResponseCode() != 200) return null;
+            byte[] buf = new byte[256]; int n = c.getInputStream().read(buf);
+            return n > 0 && new String(buf, 0, n).contains("status") ? base : null;
+        } catch (Exception e) { return null; }
+    }
+
+    private static String scanLan() {
+        try {
+            String prefix = null;
+            for (NetworkInterface ni : Collections.list(NetworkInterface.getNetworkInterfaces())) {
+                for (InetAddress a : Collections.list(ni.getInetAddresses())) {
+                    if (a instanceof Inet4Address && a.isSiteLocalAddress()) {
+                        String ip = a.getHostAddress();
+                        prefix = ip.substring(0, ip.lastIndexOf('.') + 1);
+                    }
+                }
+            }
+            if (prefix == null) return null;
+            ExecutorService ex = Executors.newFixedThreadPool(64);
+            ExecutorCompletionService<String> cs = new ExecutorCompletionService<>(ex);
+            for (int i = 1; i < 255; i++) { final String base = "http://" + prefix + i + ":8000"; cs.submit(() -> probe(base)); }
+            String hit = null;
+            long end = System.currentTimeMillis() + 15000;
+            for (int i = 0; i < 254 && hit == null; i++) {
+                Future<String> f = cs.poll(Math.max(1, end - System.currentTimeMillis()), TimeUnit.MILLISECONDS);
+                if (f == null) break;
+                hit = f.get();
+            }
+            ex.shutdownNow();
+            return hit;
+        } catch (Exception e) { return null; }
     }
 
     @Override
