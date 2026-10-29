@@ -1,6 +1,9 @@
+import hashlib
 import os
 import threading
 import time
+import urllib.request
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -37,6 +40,79 @@ class HogCounter:
         return int(len(idx))
 
 
+MODEL_URL = "https://github.com/Megvii-BaseDetection/YOLOX/releases/download/0.1.1rc0/yolox_nano.onnx"
+MODEL_SHA256 = "c789161ed43c8269fcd4e67c67eeeb4e80c622da2eb296a20bc6007bd18a0b7d"
+MODEL_PATH = Path(os.getenv("SWARM_MODEL_DIR", Path(__file__).resolve().parent.parent / "models")) / "yolox_nano.onnx"
+
+
+def ensure_model() -> Path:
+    """Download the YOLOX-nano person model (3.6 MB, Apache-2.0) once; verified by SHA-256."""
+    if MODEL_PATH.exists() and hashlib.sha256(MODEL_PATH.read_bytes()).hexdigest() == MODEL_SHA256:
+        return MODEL_PATH
+    MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+    data = urllib.request.urlopen(MODEL_URL, timeout=60).read()
+    if hashlib.sha256(data).hexdigest() != MODEL_SHA256:
+        raise RuntimeError("person model download corrupted")
+    tmp = MODEL_PATH.with_suffix(".part")
+    tmp.write_bytes(data)
+    tmp.replace(MODEL_PATH)
+    return MODEL_PATH
+
+
+class YoloxCounter:
+    """Offline neural-net person counter (YOLOX-nano via OpenCV DNN). Works on OpenCV 4 and 5,
+    more accurate than HOG on small, partial and crowded people."""
+
+    SIZE = 416
+
+    def __init__(self, threshold: float = None):
+        self.net = cv2.dnn.readNetFromONNX(str(ensure_model()))
+        self.threshold = float(threshold or os.getenv("SWARM_PERSON_CONF", "0.45"))
+        grids, strides = [], []
+        for st in (8, 16, 32):
+            n = self.SIZE // st
+            xv, yv = np.meshgrid(np.arange(n), np.arange(n))
+            grids.append(np.stack((xv, yv), 2).reshape(-1, 2))
+            strides.append(np.full((n * n, 1), st))
+        self.grids = np.concatenate(grids).astype(np.float32)
+        self.strides = np.concatenate(strides).astype(np.float32)
+        self.boxes = []
+
+    def count(self, frame) -> int:
+        S, (h, w) = self.SIZE, frame.shape[:2]
+        r = min(S / h, S / w)
+        pad = np.full((S, S, 3), 114, np.uint8)
+        pad[: int(h * r), : int(w * r)] = cv2.resize(frame, (int(w * r), int(h * r)))
+        self.net.setInput(pad.transpose(2, 0, 1)[None].astype(np.float32))
+        out = self.net.forward()[0]
+        score = out[:, 4] * out[:, 5]  # objectness * "person" class (COCO class 0)
+        m = score > self.threshold
+        self.boxes = []
+        if not m.any():
+            return 0
+        xy = (out[m, :2] + self.grids[m]) * self.strides[m]
+        wh = np.exp(out[m, 2:4]) * self.strides[m]
+        boxes = (np.concatenate([xy - wh / 2, wh], 1) / r).tolist()
+        keep = cv2.dnn.NMSBoxes(boxes, score[m].tolist(), self.threshold, 0.45)
+        idx = np.array(keep).flatten() if len(keep) else []
+        self.boxes = [tuple(int(v) for v in boxes[i]) for i in idx]
+        return int(len(idx))
+
+
+def make_local():
+    """SWARM_LOCAL_MODEL=auto (HOG when OpenCV has it, else YOLOX), hog, or yolox."""
+    want = os.getenv("SWARM_LOCAL_MODEL", "auto").lower()
+    has_hog = hasattr(cv2, "HOGDescriptor")
+    if want == "yolox" or (want == "auto" and not has_hog):
+        try:
+            return YoloxCounter()
+        except Exception as e:
+            if not has_hog:
+                raise RuntimeError(f"no local person detector: OpenCV {cv2.__version__} has no HOG and the YOLOX model failed ({e})")
+            print(f"[detector] YOLOX unavailable ({e}); using HOG")
+    return HogCounter()
+
+
 class GeminiCounter:
     def __init__(self, key: str, model: str):
         import google.generativeai as genai
@@ -56,12 +132,12 @@ class GeminiCounter:
 
 
 class Counter:
-    """auto: Gemini when GEMINI_API_KEY is set and reachable, otherwise local HOG."""
+    """auto: Gemini when GEMINI_API_KEY is set and reachable, otherwise the local detector (HOG or YOLOX)."""
 
     def __init__(self):
         mode = os.getenv("SWARM_DETECTOR", "auto").lower()
         key = os.getenv("GEMINI_API_KEY", "")
-        self.local = HogCounter()
+        self.local = make_local()
         self.remote = None
         self.skip_until = 0.0
         if mode != "local" and key:

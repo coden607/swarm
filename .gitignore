@@ -10,3 +10,4 @@ swarm.pid
 .requirements.termux
 .pytest_cache/
 swarm.err.log
+models/
