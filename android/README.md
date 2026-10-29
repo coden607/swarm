@@ -1,6 +1,9 @@
 # Android
 
-## A. Phone as a viewer (most people: 2 taps, no Termux)
+## A. Phone as a viewer (most people: no Termux)
+**Native app:** GitHub -> Actions -> latest `ci` run -> artifact **Swarm-apk** -> unzip, open `Swarm.apk` on the phone (allow "install unknown apps"), enter the server address. Gear button changes it. Live camera views and alerts while the app is open; for background push alerts use the Chrome app below.
+
+**Or Chrome web app:**
 A computer, mini PC or Pi at home already runs Swarm.
 1. In Chrome open the server's **https** link (or `http://<ip>:8000` on home Wi‑Fi).
 2. Menu → **Install app**. Open Swarm from the new home‑screen icon.
