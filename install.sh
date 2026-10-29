@@ -90,9 +90,15 @@ find_python() {
   return 1
 }
 
+termux_upgrade() {
+  # Partial upgrades break Termux (e.g. new curl + old openssl); always upgrade everything first.
+  log "Termux: upgrading packages (avoids mismatched libraries)"
+  pkg upgrade -y -o Dpkg::Options::=--force-confold || warn "pkg upgrade failed; continuing"
+}
+
 install_python() {
   log "Installing Python 3 (may ask for your password)"
-  if [ "$TERMUX" = 1 ]; then pkg install -y python
+  if [ "$TERMUX" = 1 ]; then termux_upgrade; pkg install -y python
   elif [ "$ISH" = 1 ]; then apk add python3 py3-pip
   elif have apt-get; then $SUDO apt-get update -y && $SUDO apt-get install -y python3 python3-venv python3-pip
   elif have dnf; then $SUDO dnf install -y python3 python3-pip
@@ -122,6 +128,7 @@ if [ "$ISH" = 1 ]; then
   grep -vE '^(opencv|numpy|pywebpush|audioop)' requirements.txt > .requirements.termux || true
   REQ=".requirements.termux"
 elif [ "$TERMUX" = 1 ]; then
+  termux_upgrade
   log "Termux: installing opencv + numpy via pkg"
   pkg install -y opencv-python python-numpy || warn "pkg opencv install failed"
   VENV_ARGS="--system-site-packages"

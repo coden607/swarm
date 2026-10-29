@@ -14,7 +14,7 @@ A computer, mini PC or Pi at home already runs Swarm.
 2. In Termux, paste:
 
 ```sh
-pkg install -y curl && curl -fsSL https://raw.githubusercontent.com/coden607/swarm/main/install.sh | sh
+pkg upgrade -y -o Dpkg::Options::=--force-confold && pkg install -y curl && curl -fsSL https://raw.githubusercontent.com/coden607/swarm/main/install.sh | sh
 ```
 
 3. It prints the address and admin password and opens the dashboard. In Chrome: menu → **Install app**.

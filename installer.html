@@ -33,7 +33,7 @@
   const OS = {
     unix: { name: 'Linux / macOS / Android (Termux)', cmd: `curl -fsSL ${RAW}/install.sh | sh`,
       steps: 'Open a terminal (on Android: install Termux from F‑Droid first), paste, press Enter. Adds a desktop/app icon and prints the URL, login and QR code. Prefix with SWARM_REMOTE=1 for a public link.' },
-    android: { name: 'Android', cmd: `pkg install -y curl && curl -fsSL ${RAW}/install.sh | sh`,
+    android: { name: 'Android', cmd: `pkg upgrade -y -o Dpkg::Options::=--force-confold && pkg install -y curl && curl -fsSL ${RAW}/install.sh | sh`,
       steps: '1) Install Termux from F‑Droid (button above; not the Play Store version). 2) Open Termux, paste the command, press Enter. 3) Open the printed address in Chrome → menu → Install app. If another computer/Pi already runs Swarm, skip Termux: just open its https link in Chrome → Install app → Enable alerts.' },
     win: { name: 'Windows', cmd: `irm ${RAW}/install.ps1 | iex`,
       steps: 'Open PowerShell (Administrator recommended so the firewall port opens), paste, press Enter. Adds a Desktop and Start Menu icon.' },
