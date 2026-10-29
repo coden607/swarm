@@ -4,6 +4,19 @@ import WebKit
 final class Model: ObservableObject {
     @Published var serverURL: String = UserDefaults.standard.string(forKey: "server") ?? ""
     @Published var showSettings = false
+    @Published var searching = false
+
+    /// Finds a Swarm server on the Wi-Fi (port 8000) with no typing.
+    func autoFind() {
+        searching = true
+        Task {
+            let found = await Discovery.find()
+            await MainActor.run {
+                searching = false
+                if let f = found { save(f) }
+            }
+        }
+    }
 
     func save(_ raw: String) {
         var v = raw.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -22,7 +35,13 @@ struct ContentView: View {
             if model.serverURL.isEmpty {
                 VStack(spacing: 12) {
                     Text("Swarm").font(.largeTitle).bold()
-                    Text("Enter the address of your Swarm server, e.g. 192.168.1.20:8000 or your remote link.")
+                    if model.searching {
+                        ProgressView("Looking for your Swarm server...")
+                    } else {
+                        Button("Find my server automatically") { model.autoFind() }
+                            .buttonStyle(.borderedProminent)
+                    }
+                    Text("Or enter its address, e.g. 192.168.1.20:8000 or your remote link.")
                         .multilineTextAlignment(.center)
                     TextField("Server address", text: $draft)
                         .textFieldStyle(.roundedBorder)
@@ -30,9 +49,10 @@ struct ContentView: View {
                         .disableAutocorrection(true)
                         .keyboardType(.URL)
                     Button("Connect") { model.save(draft) }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.bordered)
                 }
                 .padding()
+                .onAppear { if !model.searching { model.autoFind() } }
             } else {
                 SwarmWebView(url: model.serverURL).ignoresSafeArea(edges: .bottom)
                 Button {
@@ -53,6 +73,7 @@ struct ContentView: View {
                             .keyboardType(.URL)
                     }
                     Button("Save") { model.save(draft); model.showSettings = false }
+                    Button("Find automatically") { model.showSettings = false; model.save(""); model.autoFind() }
                 }
                 .navigationTitle("Settings")
             }
@@ -152,6 +173,46 @@ struct SwarmWebView: UIViewRepresentable {
             </script>
             """
             w.loadHTMLString(html, baseURL: URL(string: "about:blank"))
+        }
+    }
+}
+
+enum Discovery {
+    static func localPrefix() -> String? {
+        var addrs: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&addrs) == 0, let first = addrs else { return nil }
+        defer { freeifaddrs(addrs) }
+        var ptr = first
+        while true {
+            let ifa = ptr.pointee
+            if let addr = ifa.ifa_addr, addr.pointee.sa_family == UInt8(AF_INET), String(cString: ifa.ifa_name) == "en0" {
+                var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+                getnameinfo(addr, socklen_t(addr.pointee.sa_len), &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST)
+                let parts = String(cString: host).split(separator: ".")
+                if parts.count == 4 { return parts[0..<3].joined(separator: ".") }
+            }
+            guard let next = ifa.ifa_next else { break }
+            ptr = next
+        }
+        return nil
+    }
+
+    static func probe(_ base: String) async -> String? {
+        guard let url = URL(string: base + "/health") else { return nil }
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 1.2
+        guard let (data, resp) = try? await URLSession.shared.data(for: req),
+              (resp as? HTTPURLResponse)?.statusCode == 200,
+              String(data: data, encoding: .utf8)?.contains("status") == true else { return nil }
+        return base
+    }
+
+    static func find() async -> String? {
+        guard let prefix = localPrefix() else { return nil }
+        return await withTaskGroup(of: String?.self) { group in
+            for i in 1...254 { let base = "http://\(prefix).\(i):8000"; group.addTask { await probe(base) } }
+            for await r in group { if let r = r { group.cancelAll(); return r } }
+            return nil
         }
     }
 }

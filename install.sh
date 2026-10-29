@@ -372,7 +372,11 @@ done
 URL="$SCHEME://$LAN_IP:$PORT"
 if [ "$UP" = 1 ]; then
   log "Swarm is running: $URL   (this device: $SCHEME://localhost:$PORT)"
-  venv/bin/python -c "import qrcode,sys; q=qrcode.QRCode(border=1); q.add_data(sys.argv[1]); q.print_ascii(invert=True)" "$URL" 2>/dev/null || true
+  PASS_NOW="$(grep '^ADMIN_PASS=' .env 2>/dev/null | cut -d= -f2-)"
+  PAIR="$URL"; [ -n "$PASS_NOW" ] && PAIR="$URL/#key=$PASS_NOW"
+  echo; echo "  Scan with your phone camera: opens Swarm already signed in (same Wi-Fi)"
+  venv/bin/python -c "import qrcode,sys; q=qrcode.QRCode(border=1); q.add_data(sys.argv[1]); q.print_ascii(invert=True)" "$PAIR" 2>/dev/null || true
+  [ "$PAIR" != "$URL" ] && echo "  Phone link: $PAIR"
   if [ -n "$NEW_PASS" ]; then
     echo
     echo "  Login:    admin"

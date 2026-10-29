@@ -111,8 +111,17 @@ function beep() {
 function notify(msg) { try { if (window.Notification && Notification.permission === "granted") new Notification("Swarm alert", { body: msg, icon: "icon-192.png", tag: "swarm" }); } catch (e) {} }
 function when(ts) { return new Date(ts).toLocaleString(); }
 
+async function pairFromHash() { // "#key=<password>" from the installer's QR/link: sign in once, then hide the key
+  const m = /[#&]key=([^&]+)/.exec(location.hash || ""); if (!m) return;
+  try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
+  try {
+    const r = await fetch(`/login?username=admin&password=${m[1]}`, { method: "POST" });
+    if (r.ok) { token = (await r.json()).access_token; try { localStorage.setItem("swarm_token", token); } catch (e) {} }
+  } catch (e) {}
+}
 async function render() {
   clearInterval(tick);
+  if (!token) await pairFromHash();
   if (!token) { // browser on the server machine itself: sign in automatically
     try { const r = await fetch("/local-token"); if (r.ok) { token = (await r.json()).access_token; try { localStorage.setItem("swarm_token", token); } catch (e) {} } } catch (e) {}
   }

@@ -33,7 +33,7 @@ CAM_FILE, SET_FILE = DATA / "cameras.json", DATA / "settings.json"
 JWT_SECRET = os.getenv("JWT_SECRET") or secrets.token_hex(32)  # random per-run if unset
 ADMIN_USER = os.getenv("ADMIN_USER", "admin")
 ADMIN_PASS = os.getenv("ADMIN_PASS", "")
-TOKEN_TTL = 12 * 3600
+TOKEN_TTL = int(float(os.getenv("SWARM_TOKEN_DAYS", "30")) * 86400)  # stay signed in on paired devices
 
 cameras: Dict[str, CameraProcessor] = {}
 settings = {"total_threshold": 0}  # 0 = combined-swarm alert off
