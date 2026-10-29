@@ -121,7 +121,9 @@ async function render() {
   await refresh(); tick = setInterval(refresh, 2000);
 }
 
+let lastStatus = { cameras: [] };
 function draw(s, ev, offlineTs) {
+  lastStatus = s || lastStatus;
   const b = $("banner");
   b.className = "card" + (s.alarm && !offlineTs ? " alarm" : "");
   b.textContent = offlineTs ? `Last known: ${s.total} people across ${s.cameras.length} camera(s)` :
@@ -207,7 +209,22 @@ $("scan").onclick = async () => {
   try {
     const { devices } = await api("/discover");
     $("found").innerHTML = devices.length ? "" : "No cameras found. Enter the address manually.";
-    devices.forEach(d => { const b = document.createElement("button"); b.className = "sec"; b.textContent = `Use ${d.ip} – ${d.hint}`; b.onclick = () => { $("curl").value = d.ip; $("cu").focus(); }; $("found").appendChild(b); });
+    const have = new Set((lastStatus.cameras || []).map(c => c.url));
+    const fresh = devices.filter(d => !have.has(d.ip));
+    if (fresh.length) {
+      const all = document.createElement("button"); all.id = "addall"; all.textContent = `Add all ${fresh.length} found camera${fresh.length > 1 ? "s" : ""}`;
+      all.onclick = async () => {
+        all.disabled = true; let ok = 0, bad = [];
+        for (const d of fresh) {
+          try { await api(`/cameras/${encodeURIComponent("cam-" + d.ip.replace(/\./g, "-"))}`, { method: "POST", body: JSON.stringify({ url: d.ip, brand: $("brand").value, username: $("cu").value, password: $("cp").value, threshold: +$("thr").value }) }); ok++; }
+          catch (e) { bad.push(d.ip); }
+        }
+        $("found").textContent = `Added ${ok} camera${ok === 1 ? "" : "s"}.` + (bad.length ? ` Failed: ${bad.join(", ")}.` : "") + " Cameras that need a password show 'connecting' until you enter the username/password above and add them again.";
+        refresh();
+      };
+      $("found").appendChild(all);
+    }
+    devices.forEach(d => { const b = document.createElement("button"); b.className = "sec"; b.textContent = `${have.has(d.ip) ? "Added: " : "Use "}${d.ip} – ${d.hint}`; b.disabled = have.has(d.ip); b.onclick = () => { $("curl").value = d.ip; $("cu").focus(); }; $("found").appendChild(b); });
   } catch (e) { $("found").textContent = ""; err(e); }
 };
 function stopPhone() { clearInterval(phoneTimer); phoneTimer = null; const v = $("vid"); if (v.srcObject) v.srcObject.getTracks().forEach(t => t.stop()); v.srcObject = null; }
