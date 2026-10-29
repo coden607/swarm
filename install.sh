@@ -166,6 +166,10 @@ if [ "$TERMUX" = 1 ]; then
   done
 elif [ "$ISH" = 1 ]; then venv/bin/python -m pip install -q pywebpush >/dev/null 2>&1 || warn "phone push alerts unavailable on this device (pywebpush failed to build)"; fi
 venv/bin/python -m pip install -q qrcode >/dev/null 2>&1 || true   # optional, for QR output
+if ! venv/bin/python -c "import cv2,sys; sys.exit(0 if hasattr(cv2,'HOGDescriptor') else 1)" 2>/dev/null; then
+  log "OpenCV $(venv/bin/python -c 'import cv2;print(cv2.__version__)' 2>/dev/null) has no HOG: downloading the neural-net person model (3.6 MB)"
+  venv/bin/python -c "from app.detector import ensure_model; ensure_model()" || warn "person model download failed; it will retry when a camera starts"
+fi
 
 LAN_IP="$(venv/bin/python -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.connect(('10.255.255.255', 1)); print(s.getsockname()[0])" 2>/dev/null || echo 127.0.0.1)"
 
@@ -391,7 +395,8 @@ fi
 # ---------------------------------------------------------------- 9. verify + report
 UP=0
 i=0
-while [ "$i" -lt 40 ]; do
+WAIT=40; { [ "$TERMUX" = 1 ] || [ "$ISH" = 1 ]; } && WAIT=120   # phones start slower
+while [ "$i" -lt "$WAIT" ]; do
   if venv/bin/python -c "import ssl,urllib.request as u; u.urlopen('$SCHEME://127.0.0.1:$PORT/health', timeout=2, context=ssl._create_unverified_context())" 2>/dev/null; then UP=1; break; fi
   i=$((i + 1)); sleep 1
 done

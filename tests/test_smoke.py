@@ -16,15 +16,17 @@ os.environ["SWARM_SERVER_SOUND"] = "0"
 os.environ.pop("GEMINI_API_KEY", None)
 
 
-from app.detector import HogCounter  # noqa: E402
+from app.detector import HogCounter, YoloxCounter  # noqa: E402
 
 REAL_COUNT = HogCounter.count
+REAL_YOLOX_COUNT = YoloxCounter.count
 
 
 @pytest.fixture(scope="module", autouse=True)
 def fake_count():
     mp = pytest.MonkeyPatch()
     mp.setattr(HogCounter, "count", lambda self, f: 5)
+    mp.setattr(YoloxCounter, "count", lambda self, f: 5)  # OpenCV 5 uses YOLOX
     yield
     mp.undo()
 
@@ -86,6 +88,8 @@ def test_auth_required(client):
 
 
 def test_hog_runs_on_blank(jpeg):
+    if not hasattr(cv2, "HOGDescriptor"):
+        pytest.skip("OpenCV 5: no HOG")
     img = cv2.imdecode(np.frombuffer(jpeg, np.uint8), cv2.IMREAD_COLOR)
     assert REAL_COUNT(HogCounter(), img) == 0
 
@@ -168,3 +172,21 @@ def test_persistence_and_delete(client):
     assert client.delete("/cameras/ph").status_code == 200
     assert client.delete("/cameras/nope").status_code == 404
     assert "snap" not in main.CAM_FILE.read_text()
+
+
+def test_yolox_counts_people():
+    """Neural-net detector (used automatically on OpenCV 5, e.g. Termux)."""
+    data = pytest.importorskip("skimage.data")
+    from app.detector import YoloxCounter, make_local
+    try:
+        y = YoloxCounter()
+    except Exception as e:  # offline CI runner
+        pytest.skip(f"model unavailable: {e}")
+    a = np.ascontiguousarray(data.astronaut()[:, :, ::-1])
+    six = np.ascontiguousarray(np.vstack([np.hstack([a, a, a])] * 2))
+    count = lambda img: REAL_YOLOX_COUNT(y, img)
+    assert count(a) == 1
+    assert count(six) == 6 and len(y.boxes) == 6
+    assert count(np.full((360, 640, 3), 90, np.uint8)) == 0
+    if not hasattr(cv2, "HOGDescriptor"):
+        assert isinstance(make_local(), YoloxCounter)
