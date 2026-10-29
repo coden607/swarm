@@ -50,6 +50,16 @@ jobs:
       - run: brew install xcodegen
       - run: cd ios && xcodegen
       - run: cd ios && xcodebuild -project Swarm.xcodeproj -scheme Swarm -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+  install-ish:
+    runs-on: ubuntu-latest
+    container: alpine:3.20
+    steps:
+      - run: apk add --no-cache curl git
+      - uses: actions/checkout@v4
+      - name: Alpine (iSH path) installer
+        run: SWARM_FORCE_ISH=1 SWARM_NO_OPEN=1 SWARM_PORT=8123 GEMINI_API_KEY= sh ./install.sh
+      - name: Health
+        run: curl -fsS http://127.0.0.1:8123/health
   ios-ipa:
     runs-on: macos-latest
     steps:
