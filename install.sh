@@ -121,6 +121,7 @@ fi
 # ---------------------------------------------------------------- 3. venv + deps
 REQ="requirements.txt"
 VENV_ARGS=""
+PIP_EXTRA=""
 if [ "$ISH" = 1 ]; then
   log "iSH: installing opencv + numpy via apk (slow emulated CPU: expect low frame rates)"
   apk add py3-opencv py3-numpy py3-pip || warn "apk opencv install failed"
@@ -130,9 +131,14 @@ if [ "$ISH" = 1 ]; then
 elif [ "$TERMUX" = 1 ]; then
   termux_upgrade
   log "Termux: installing opencv + numpy via pkg"
-  pkg install -y opencv-python python-numpy || warn "pkg opencv install failed"
+  pkg install -y x11-repo >/dev/null 2>&1 || true   # opencv-python lives in the x11 repo
+  pkg install -y python-numpy || warn "pkg numpy install failed"
+  pkg install -y opencv-python || pkg install -y python-opencv-python || warn "pkg opencv install failed (people detection needs it)"
+  pkg install -y binutils libxml2 libxslt >/dev/null 2>&1 || true
   VENV_ARGS="--system-site-packages"
-  grep -vE '^(opencv|numpy|pywebpush)' requirements.txt > .requirements.termux || true
+  PIP_EXTRA="--prefer-binary --extra-index-url https://termux-user-repository.github.io/pypi/"   # prebuilt Android wheels (pydantic-core etc.)
+  # core only; optional extras are installed best-effort below (uvicorn[standard] needs Rust: use plain uvicorn)
+  grep -E '^(fastapi|uvicorn|python-dotenv|pyjwt)' requirements.txt | sed 's/\[standard\]//' > .requirements.termux || true
   REQ=".requirements.termux"
 fi
 
@@ -143,8 +149,22 @@ if [ ! -x venv/bin/python ]; then
 fi
 log "Installing Python dependencies (first run takes a few minutes)"
 venv/bin/python -m pip install -q --upgrade pip
-venv/bin/python -m pip install -q -r "$REQ"
-if [ "$TERMUX" = 1 ] || [ "$ISH" = 1 ]; then venv/bin/python -m pip install -q pywebpush >/dev/null 2>&1 || warn "phone push alerts unavailable on this device (pywebpush failed to build)"; fi
+# shellcheck disable=SC2086
+if ! venv/bin/python -m pip install -q $PIP_EXTRA -r "$REQ"; then
+  if [ "$TERMUX" = 1 ]; then
+    warn "No prebuilt wheel for some packages; building from source with Rust (about 10 minutes, keep Termux open)"
+    pkg install -y rust binutils
+    venv/bin/python -m pip install -q $PIP_EXTRA -r "$REQ" || die "Python packages failed to install. Send the lines above to support."
+  else
+    die "Python packages failed to install."
+  fi
+fi
+if [ "$TERMUX" = 1 ]; then
+  for p in pywebpush onvif-zeep pydub audioop-lts google-generativeai; do
+    # shellcheck disable=SC2086
+    venv/bin/python -m pip install -q $PIP_EXTRA "$p" >/dev/null 2>&1 || warn "optional package $p not installed (the app still works)"
+  done
+elif [ "$ISH" = 1 ]; then venv/bin/python -m pip install -q pywebpush >/dev/null 2>&1 || warn "phone push alerts unavailable on this device (pywebpush failed to build)"; fi
 venv/bin/python -m pip install -q qrcode >/dev/null 2>&1 || true   # optional, for QR output
 
 LAN_IP="$(venv/bin/python -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.connect(('10.255.255.255', 1)); print(s.getsockname()[0])" 2>/dev/null || echo 127.0.0.1)"
