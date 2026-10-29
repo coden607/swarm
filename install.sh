@@ -134,7 +134,7 @@ elif [ "$TERMUX" = 1 ]; then
   pkg install -y x11-repo >/dev/null 2>&1 || true   # opencv-python lives in the x11 repo
   pkg install -y python-numpy || warn "pkg numpy install failed"
   pkg install -y opencv-python || pkg install -y python-opencv-python || warn "pkg opencv install failed (people detection needs it)"
-  pkg install -y binutils libxml2 libxslt >/dev/null 2>&1 || true
+  pkg install -y binutils libxml2 libxslt dbus >/dev/null 2>&1 || true   # dbus: Termux opencv pulls Qt, which needs libdbus-1.so
   VENV_ARGS="--system-site-packages"
   PIP_EXTRA="--prefer-binary --extra-index-url https://termux-user-repository.github.io/pypi/"   # prebuilt Android wheels (pydantic-core etc.)
   # core only; optional extras are installed best-effort below (uvicorn[standard] needs Rust: use plain uvicorn)
@@ -166,6 +166,10 @@ if [ "$TERMUX" = 1 ]; then
   done
 elif [ "$ISH" = 1 ]; then venv/bin/python -m pip install -q pywebpush >/dev/null 2>&1 || warn "phone push alerts unavailable on this device (pywebpush failed to build)"; fi
 venv/bin/python -m pip install -q qrcode >/dev/null 2>&1 || true   # optional, for QR output
+if ! CVERR="$(venv/bin/python -c "import cv2" 2>&1)"; then
+  if [ "$TERMUX" = 1 ]; then pkg install -y dbus >/dev/null 2>&1 || true; fi
+  CVERR="$(venv/bin/python -c "import cv2" 2>&1)" || die "OpenCV does not load: $(printf '%s' "$CVERR" | tail -n 1)"
+fi
 if ! venv/bin/python -c "import cv2,sys; sys.exit(0 if hasattr(cv2,'HOGDescriptor') else 1)" 2>/dev/null; then
   log "OpenCV $(venv/bin/python -c 'import cv2;print(cv2.__version__)' 2>/dev/null) has no HOG: downloading the neural-net person model (3.6 MB)"
   venv/bin/python -c "from app.detector import ensure_model; ensure_model()" || warn "person model download failed; it will retry when a camera starts"
