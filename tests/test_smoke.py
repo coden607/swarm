@@ -190,3 +190,22 @@ def test_yolox_counts_people():
     assert count(np.full((360, 640, 3), 90, np.uint8)) == 0
     if not hasattr(cv2, "HOGDescriptor"):
         assert isinstance(make_local(), YoloxCounter)
+
+
+def test_brand_guess_from_banner():
+    from app.sources import _http_banner, guess_brand
+    assert guess_brand('Server: App-webs/ realm="DS-2CD2143"') == "hikvision"
+    assert guess_brand("<title>Reolink</title>") == "reolink"
+    assert guess_brand("onvif://www.onvif.org/name/Dahua onvif://www.onvif.org/hardware/IPC") == "dahua"
+    assert guess_brand("nginx") == ""
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(401); self.send_header("Server", "Hikvision-Webs"); self.send_header("WWW-Authenticate", 'Digest realm="IP Camera"'); self.end_headers()
+        def log_message(self, *a): pass
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        assert guess_brand(_http_banner("127.0.0.1", srv.server_address[1])) == "hikvision"
+    finally:
+        srv.shutdown()

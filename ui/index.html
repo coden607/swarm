@@ -120,6 +120,7 @@
         <select id="brand"><option value="generic">Brand: auto‑detect</option><option>onvif</option><option>hikvision</option><option>dahua</option><option>amcrest</option><option>axis</option><option>reolink</option><option>tapo</option><option>foscam</option><option>unifi</option></select>
         <input id="thr" type="number" min="1" value="10" title="People that trigger an alert" />
       </div>
+      <small id="tip"></small>
       <input id="cid" placeholder="Name (optional, e.g. front-door)" />
       <button id="add">Add camera</button>
       <div class="row"><button id="scan" class="sec">Scan network for cameras</button><button id="phone" class="sec">Use this device's camera</button></div>
@@ -267,6 +268,20 @@ $("add").onclick = () => {
   api(`/cameras/${encodeURIComponent(id)}`, { method: "POST", body: JSON.stringify({ url: a, brand: $("brand").value, username: $("cu").value, password: $("cp").value, threshold: +$("thr").value }) })
     .then(() => { err(""); $("curl").value = ""; $("cp").value = ""; refresh(); }, err);
 };
+const TIPS = {
+  generic: "Most cameras: turn on ONVIF or RTSP in the camera's own app, then use the camera's username/password. Not supported (no local video): Ring, Nest, Arlo, Blink, most Eufy, stock Wyze.",
+  onvif: "Use the camera's ONVIF user (some brands need ONVIF switched on in their app first).",
+  hikvision: "Hikvision: use the camera's admin login. RTSP is on by default.",
+  dahua: "Dahua: use the admin login. RTSP is on by default.",
+  amcrest: "Amcrest: use the admin login. RTSP is on by default.",
+  axis: "Axis: use an Axis user account (viewer or admin).",
+  reolink: "Reolink: if it won't connect, turn on RTSP/ONVIF in the Reolink app (network / advanced / server settings) and use the camera's admin login.",
+  tapo: "Tapo: in the Tapo app open the camera > Settings > Advanced settings > Camera account, create a username/password and use that here (not your TP-Link login).",
+  foscam: "Foscam: use the camera's admin account.",
+  unifi: "UniFi Protect: enable RTSP for the camera in Protect (camera > Settings > Advanced), then paste the rtsp:// link here.",
+};
+const showTip = b => { $("tip").textContent = TIPS[b] || TIPS.generic; };
+$("brand").onchange = () => showTip($("brand").value); showTip("generic");
 $("scan").onclick = async () => {
   $("found").textContent = "Scanning your network (about 10 s)…";
   try {
@@ -279,7 +294,7 @@ $("scan").onclick = async () => {
       all.onclick = async () => {
         all.disabled = true; let ok = 0, bad = [];
         for (const d of fresh) {
-          try { await api(`/cameras/${encodeURIComponent("cam-" + d.ip.replace(/\./g, "-"))}`, { method: "POST", body: JSON.stringify({ url: d.ip, brand: $("brand").value, username: $("cu").value, password: $("cp").value, threshold: +$("thr").value }) }); ok++; }
+          try { await api(`/cameras/${encodeURIComponent((d.brand || "cam") + "-" + d.ip.split(".").pop())}`, { method: "POST", body: JSON.stringify({ url: d.ip, brand: d.brand || $("brand").value, username: $("cu").value, password: $("cp").value, threshold: +$("thr").value }) }); ok++; }
           catch (e) { bad.push(d.ip); }
         }
         $("found").textContent = `Added ${ok} camera${ok === 1 ? "" : "s"}.` + (bad.length ? ` Failed: ${bad.join(", ")}.` : "") + " Cameras that need a password show 'connecting' until you enter the username/password above and add them again.";
@@ -287,7 +302,7 @@ $("scan").onclick = async () => {
       };
       $("found").appendChild(all);
     }
-    devices.forEach(d => { const b = document.createElement("button"); b.className = "sec"; b.textContent = `${have.has(d.ip) ? "Added: " : "Use "}${d.ip} – ${d.hint}`; b.disabled = have.has(d.ip); b.onclick = () => { $("curl").value = d.ip; $("cu").focus(); }; $("found").appendChild(b); });
+    devices.forEach(d => { const b = document.createElement("button"); b.className = "sec"; b.textContent = `${have.has(d.ip) ? "Added: " : "Use "}${d.ip} – ${d.hint}`; b.disabled = have.has(d.ip); b.onclick = () => { $("curl").value = d.ip; if (d.brand) $("brand").value = d.brand; showTip(d.brand || $("brand").value); $("cu").focus(); }; $("found").appendChild(b); });
   } catch (e) { $("found").textContent = ""; err(e); }
 };
 function stopPhone() { clearInterval(phoneTimer); phoneTimer = null; const v = $("vid"); if (v.srcObject) v.srcObject.getTracks().forEach(t => t.stop()); v.srcObject = null; }
