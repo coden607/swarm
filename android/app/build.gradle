@@ -1,4 +1,5 @@
 plugins { id 'com.android.application' }
+def ks = System.getenv("SWARM_KEYSTORE")   // CI: decoded from the ANDROID_KEYSTORE_B64 secret, if set
 android {
     namespace 'com.coden607.swarm'
     compileSdk 34
@@ -6,8 +7,26 @@ android {
         applicationId 'com.coden607.swarm'
         minSdk 24
         targetSdk 34
-        versionCode 2
-        versionName '2.0'
+        versionCode 3
+        versionName '2.1'
+    }
+    signingConfigs {
+        release {
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv("SWARM_KEYSTORE_PASS")
+                keyAlias 'swarm'
+                keyPassword System.getenv("SWARM_KEYSTORE_PASS")
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled true        // R8: strip and optimize code
+            shrinkResources true      // drop unused resources
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig ks ? signingConfigs.release : signingConfigs.debug
+        }
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
