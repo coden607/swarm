@@ -57,8 +57,12 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '17' }
       - run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
-      - run: cd android && gradle --no-daemon assembleDebug
-      - run: cp android/app/build/outputs/apk/debug/app-debug.apk Swarm.apk
+      - name: Signing key (optional secret ANDROID_KEYSTORE_B64 + ANDROID_KEYSTORE_PASS; else debug key)
+        env: { KS: "${{ secrets.ANDROID_KEYSTORE_B64 }}" }
+        run: if [ -n "$KS" ]; then echo "$KS" | base64 -d > "$RUNNER_TEMP/swarm.jks" && echo "SWARM_KEYSTORE=$RUNNER_TEMP/swarm.jks" >> "$GITHUB_ENV"; fi
+      - run: cd android && gradle --no-daemon assembleRelease
+        env: { SWARM_KEYSTORE_PASS: "${{ secrets.ANDROID_KEYSTORE_PASS }}" }
+      - run: cp android/app/build/outputs/apk/release/app-release.apk Swarm.apk && ls -l Swarm.apk
       - uses: actions/upload-artifact@v4
         with:
           name: Swarm-apk

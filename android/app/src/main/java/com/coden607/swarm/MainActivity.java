@@ -18,6 +18,10 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.Toast;
+import android.content.Intent;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import java.net.HttpURLConnection;
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -38,10 +42,14 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         prefs = getSharedPreferences("swarm", MODE_PRIVATE);
-        requestPermissions(new String[]{Manifest.permission.CAMERA}, 1);
+        getWindow().setStatusBarColor(0xff05060f);
+        getWindow().setNavigationBarColor(0xff05060f);
+        if (Build.VERSION.SDK_INT >= 33) requestPermissions(new String[]{Manifest.permission.CAMERA, Manifest.permission.POST_NOTIFICATIONS}, 1);
+        else requestPermissions(new String[]{Manifest.permission.CAMERA}, 1);
 
         FrameLayout root = new FrameLayout(this);
         web = new WebView(this);
+        web.setBackgroundColor(0xff05060f);  // no white flash before the dark dashboard paints
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
@@ -50,10 +58,11 @@ public class MainActivity extends Activity {
             @Override public void onPermissionRequest(PermissionRequest r) { r.grant(r.getResources()); }
         });
         web.setWebViewClient(new WebViewClient() {
+            @Override public void onPageFinished(WebView v, String url) { grabToken(); }
             @Override public void onReceivedError(WebView v, WebResourceRequest req, WebResourceError e) {
                 if (req.isForMainFrame()) {
                     v.loadDataWithBaseURL(null,
-                        "<body style='font-family:sans-serif;background:#111;color:#eee;padding:2rem;text-align:center'>"
+                        "<body style='font-family:sans-serif;background:#05060f;color:#e8ecff;padding:2rem;text-align:center'>"
                         + "<h2>Swarm server unreachable</h2><p>Check Wi-Fi and the server address (gear button).</p>"
                         + "<button onclick='location.href=\"" + prefs.getString("server", "") + "\"' style='font-size:1.2rem;padding:.6rem 1.2rem'>Retry</button></body>",
                         "text/html", "utf-8", null);
@@ -83,6 +92,12 @@ public class MainActivity extends Activity {
             .setView(in)
             .setCancelable(false)
             .setNeutralButton("Find automatically", (d, w) -> discover())
+            .setNegativeButton(prefs.getBoolean("alerts", true) ? "Background alerts: ON" : "Background alerts: OFF", (d, w) -> {
+                boolean on = !prefs.getBoolean("alerts", true);
+                prefs.edit().putBoolean("alerts", on).apply();
+                if (on) AlertService.start(this); else stopService(new Intent(this, AlertService.class));
+                Toast.makeText(this, on ? "Swarm alerts on, even when the app is closed" : "Background alerts off", Toast.LENGTH_LONG).show();
+            })
             .setPositiveButton("Connect", (d, w) -> {
                 String v = in.getText().toString().trim();
                 if (v.isEmpty()) return;
@@ -92,6 +107,26 @@ public class MainActivity extends Activity {
             })
             .show();
     }
+
+    private final Handler ui = new Handler(Looper.getMainLooper());
+
+    /** Copies the dashboard's sign-in token so AlertService can watch for swarms while the app is closed. */
+    private void grabToken() {
+        web.evaluateJavascript("(function(){try{return localStorage.getItem('swarm_token')}catch(e){return null}})()", v -> {
+            if (v != null && v.length() > 10 && !v.equals("null")) {
+                String t = v.replace("\"", "");
+                if (!t.equals(prefs.getString("token", ""))) prefs.edit().putString("token", t).apply();
+                AlertService.start(this);
+            }
+        });
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        ui.postDelayed(new Runnable() { @Override public void run() { if (!isFinishing()) { grabToken(); ui.postDelayed(this, 20000); } } }, 5000);
+    }
+
+    @Override protected void onPause() { super.onPause(); ui.removeCallbacksAndMessages(null); }
 
     /** Finds a Swarm server with no typing: this phone (Termux) first, then the Wi-Fi network (port 8000). */
     private void discover() {
