@@ -19,6 +19,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.Toast;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -54,10 +55,22 @@ public class MainActivity extends Activity {
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);
+        s.setSupportMultipleWindows(false);
         web.setWebChromeClient(new WebChromeClient() {
             @Override public void onPermissionRequest(PermissionRequest r) { r.grant(r.getResources()); }
         });
         web.setWebViewClient(new WebViewClient() {
+            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                Uri uri = request.getUrl();
+                String scheme = uri.getScheme();
+                if (scheme == null) return false;
+                // Keep http/https inside the app. Everything else (intent:, market:, etc.) is ignored so nothing else opens.
+                if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
+                    view.loadUrl(uri.toString());
+                    return true;
+                }
+                return true; // swallow non-web schemes so no other app launches
+            }
             @Override public void onPageFinished(WebView v, String url) { grabToken(); }
             @Override public void onReceivedError(WebView v, WebResourceRequest req, WebResourceError e) {
                 if (req.isForMainFrame()) {
