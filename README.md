@@ -7,7 +7,7 @@ Download one file, double‑click it, done (it installs, adds a desktop icon, st
 - **Windows:** [Install-Windows.bat](https://github.com/coden607/swarm/raw/main/Install-Windows.bat)
 - **macOS:** [Install-Mac.command](https://github.com/coden607/swarm/raw/main/Install-Mac.command) (first time: right‑click → Open)
 - **Linux:** [Install-Linux.sh](https://github.com/coden607/swarm/raw/main/Install-Linux.sh)
-- **Android:** install Termux from F‑Droid, then run the one‑liner below (Android doesn't allow a no‑step install). Or just open a server's URL in Chrome → **Install app**.
+- **Android:** [Swarm.apk](https://github.com/coden607/swarm/releases/download/apk/Swarm.apk) — open the file to install (allow installs from your browser once). It finds your server and keeps swarm alerts on in the background. To run the server on the phone, install Termux from F‑Droid and use the one‑liner below.
 - **iPhone/iPad:** works as a viewer/controller of the server (live camera view, alerts, add cameras). Open the server's **https** link in Safari → Share → Add to Home Screen → open it from the Home Screen → **Enable alerts on this device** for push notifications (iOS 16.4+). Native test app in `ios/`.
 
 On first open with no cameras it scans your network automatically; tap a result, add the camera's login if it has one, and you're counting.
@@ -51,6 +51,7 @@ Cameras reconnect automatically and are remembered across restarts.
 
 ## Apps
 - **Desktop icon:** created by the installer.
+- **Android app:** [Swarm.apk](https://github.com/coden607/swarm/releases/download/apk/Swarm.apk) — open the file to install.
 - **Android / desktop Chrome/Edge:** open the URL → **Install app**.
 - **iPhone/iPad (PWA):** Safari → Share → Add to Home Screen.
 - **iPhone test app (native wrapper):** see [`ios/README.md`](ios/README.md).
