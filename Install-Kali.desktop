@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Install Swarm on Kali
+Comment=Install Swarm Detection and open the dashboard
+Exec=x-terminal-emulator -e sh -c 'f="$(dirname "$1")/Install-Kali.sh"; exec sh "$f"' sh %k
+Icon=utilities-terminal
+Terminal=false
+Categories=Utility;Network;Security;
+StartupNotify=true

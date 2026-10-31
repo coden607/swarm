@@ -7,6 +7,7 @@ Download one file, double‑click it, done (it installs, adds a desktop icon, st
 - **Windows:** [Install-Windows.bat](https://github.com/coden607/swarm/raw/main/Install-Windows.bat)
 - **macOS:** [Install-Mac.command](https://github.com/coden607/swarm/raw/main/Install-Mac.command) (first time: right‑click → Open)
 - **Linux:** [Install-Linux.sh](https://github.com/coden607/swarm/raw/main/Install-Linux.sh)
+- **Kali:** [Install Swarm on Kali](https://github.com/coden607/swarm/raw/main/Install-Kali.desktop) (or [Install-Kali.sh](https://github.com/coden607/swarm/raw/main/Install-Kali.sh)). Open it, allow the terminal, and the dashboard starts at http://localhost:8000.
 - **Android:** [Swarm.apk](https://github.com/coden607/swarm/releases/download/apk/Swarm.apk) — open the file to install (allow installs from your browser once). It finds your server and keeps swarm alerts on in the background. To run the server on the phone, install Termux from F‑Droid and use the one‑liner below.
 - **iPhone/iPad:** works as a viewer/controller of the server (live camera view, alerts, add cameras). Open the server's **https** link in Safari → Share → Add to Home Screen → open it from the Home Screen → **Enable alerts on this device** for push notifications (iOS 16.4+). Native test app in `ios/`.
 

@@ -23,6 +23,10 @@ TERMUX=0
 if [ -n "${TERMUX_VERSION:-}" ] || [ -d /data/data/com.termux ]; then TERMUX=1; fi
 ISH=0   # iSH (Alpine on iPhone): uses apk-provided opencv/numpy, background start, no service
 if { [ -e /proc/ish ] || [ "${SWARM_FORCE_ISH:-0}" = 1 ]; } && command -v apk >/dev/null 2>&1; then ISH=1; fi
+KALI=0
+if [ -f /etc/os-release ] && grep -q '^ID=kali$' /etc/os-release; then KALI=1; fi
+if [ "${SWARM_FORCE_KALI:-0}" = 1 ]; then KALI=1; fi
+if [ "$KALI" = 1 ]; then log "Kali Linux: installing into a virtualenv (system Python is externally managed)"; fi
 SUDO=""
 if [ "$(id -u)" -ne 0 ] && have sudo; then SUDO="sudo"; fi
 
@@ -115,6 +119,9 @@ if [ -z "$PY" ]; then install_python; PY="$(find_python || true)"; fi
 [ -n "$PY" ] || die "Python 3.9+ not found after install attempt."
 
 if ! "$PY" -c 'import venv, ensurepip' 2>/dev/null; then
+  if [ "$KALI" = 1 ] && [ -n "$SUDO" ] && ! $SUDO -n true 2>/dev/null; then
+    die "Kali needs a virtualenv. Run: sudo apt install python3-venv python3-pip python3-full"
+  fi
   if have apt-get; then $SUDO apt-get install -y python3-venv python3-pip; else die "Python venv module missing."; fi
 fi
 
@@ -313,6 +320,21 @@ EOF
       cp "$APPS_DIR/swarm.desktop" "$D/Swarm Detection.desktop"
       chmod +x "$D/Swarm Detection.desktop"
       gio set "$D/Swarm Detection.desktop" metadata::trusted true 2>/dev/null || true
+    fi
+    if [ "$KALI" = 1 ] && [ -n "$D" ] && [ -f "$SWARM_HOME/Install-Kali.sh" ]; then
+      cat > "$D/Install Swarm on Kali.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Install Swarm on Kali
+Comment=Install or update Swarm Detection, then open it
+Exec=x-terminal-emulator -e sh "$SWARM_HOME/Install-Kali.sh"
+Icon=$ICON
+Terminal=false
+Categories=Utility;Network;Security;
+StartupNotify=true
+EOF
+      chmod +x "$D/Install Swarm on Kali.desktop"
+      gio set "$D/Install Swarm on Kali.desktop" metadata::trusted true 2>/dev/null || true
     fi
     have update-desktop-database && update-desktop-database "$APPS_DIR" 2>/dev/null || true
     log "Icon added to your app menu${D:+ and Desktop}"
