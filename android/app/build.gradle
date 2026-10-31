@@ -7,8 +7,8 @@ android {
         applicationId 'com.coden607.swarm'
         minSdk 24
         targetSdk 34
-        versionCode 4
-        versionName '2.2'
+        versionCode 5
+        versionName '2.3'
     }
     signingConfigs {
         release {
@@ -22,8 +22,8 @@ android {
     }
     buildTypes {
         release {
-            minifyEnabled true        // R8: strip and optimize code
-            shrinkResources true      // drop unused resources
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig ks ? signingConfigs.release : signingConfigs.debug
         }
