@@ -82,10 +82,38 @@
   #list .alarm{animation:alarm 1.1s ease-in-out infinite}
   #list .card::after{display:none}
   @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+  /* extra 3D holographic layers */
+  .bg::before{content:"";position:absolute;inset:-20%;background:radial-gradient(ellipse at 20% 30%,rgba(62,242,255,.18),transparent 50%),radial-gradient(ellipse at 80% 70%,rgba(155,92,255,.16),transparent 55%),radial-gradient(ellipse at 50% 50%,rgba(255,79,216,.08),transparent 40%);animation:aurora 18s ease-in-out infinite alternate;mix-blend-mode:screen}
+  .bg .orb{position:absolute;width:18vmax;height:18vmax;border-radius:50%;filter:blur(40px);opacity:.35;mix-blend-mode:screen;animation:float 14s ease-in-out infinite}
+  .bg .orb:nth-child(6){background:var(--cyan);top:10%;left:15%;animation-delay:-3s}
+  .bg .orb:nth-child(7){background:var(--violet);top:60%;right:10%;width:22vmax;height:22vmax;animation-delay:-7s}
+  .bg .orb:nth-child(8){background:var(--lime);bottom:15%;left:40%;width:14vmax;height:14vmax;animation-delay:-11s}
+  .bg .particles{position:absolute;inset:0;background-image:radial-gradient(1.5px 1.5px,rgba(62,242,255,.7) 0,transparent 70%),radial-gradient(1px 1px,rgba(255,79,216,.5) 0,transparent 60%),radial-gradient(1px 1px,rgba(93,255,176,.4) 0,transparent 50%);background-size:120px 120px,180px 180px,90px 90px;animation:stars 40s linear infinite;opacity:.6}
+  @keyframes aurora{to{transform:translate(8%,-6%) scale(1.1) rotate(3deg)}}
+  @keyframes float{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(6vmax,-8vmax) scale(1.2)}}
+  @keyframes stars{to{background-position:120px 120px, -180px 90px, 45px -90px}}
+  .card{transform-style:preserve-3d;perspective:800px;transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s}
+  .card:hover{transform:translateY(-6px) rotateX(4deg) rotateY(-2deg);box-shadow:0 20px 50px rgba(0,0,0,.5),0 0 40px rgba(62,242,255,.15)}
+  .card::before{padding:1.5px;opacity:.55}
+  h1{filter:drop-shadow(0 0 22px rgba(155,92,255,.6)) drop-shadow(0 0 40px rgba(62,242,255,.3));animation:holo 6s linear infinite,titleGlow 3s ease-in-out infinite}
+  @keyframes titleGlow{50%{filter:drop-shadow(0 0 28px rgba(255,79,216,.7)) drop-shadow(0 0 50px rgba(62,242,255,.4))}}
+  button{box-shadow:0 6px 24px rgba(62,242,255,.35),inset 0 1px 0 rgba(255,255,255,.4);background-size:200% 100%;animation:btnShift 4s ease infinite}
+  @keyframes btnShift{0%,100%{background-position:0 0}50%{background-position:100% 0}}
+  img.live{box-shadow:0 0 0 1px rgba(155,92,255,.25),0 0 40px rgba(62,242,255,.25),inset 0 0 20px rgba(0,0,0,.4);transition:box-shadow .3s}
+  .alarm{animation:alarm 1s ease-in-out infinite,alarmPulse 2s ease-in-out infinite}
+  @keyframes alarmPulse{50%{transform:scale(1.015)}}
+  .scanline{position:fixed;inset:0;z-index:5;pointer-events:none;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px);mix-blend-mode:overlay;opacity:.4}
+
 </style>
 </head>
 <body>
-<div class="bg" aria-hidden="true"><i></i><i></i><i></i><b></b><u></u></div>
+<div class="bg" aria-hidden="true">
+  <i></i><i></i><i></i><b></b><u></u>
+  <div class="orb"></div><div class="orb"></div><div class="orb"></div>
+  <div class="particles"></div>
+</div>
+<div class="scanline" aria-hidden="true"></div>
 <main>
   <h1>Swarm Detection</h1>
   <div id="offline" class="card off"></div>
