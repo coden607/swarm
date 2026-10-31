@@ -327,7 +327,7 @@ EOF
 Type=Application
 Name=Install Swarm on Kali
 Comment=Install or update Swarm Detection, then open it
-Exec=x-terminal-emulator -e sh "$SWARM_HOME/Install-Kali.sh"
+Exec=x-terminal-emulator -e "sh '$SWARM_HOME/Install-Kali.sh'"
 Icon=$ICON
 Terminal=false
 Categories=Utility;Network;Security;
