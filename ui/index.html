@@ -105,6 +105,20 @@
   @keyframes alarmPulse{50%{transform:scale(1.015)}}
   .scanline{position:fixed;inset:0;z-index:5;pointer-events:none;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px);mix-blend-mode:overlay;opacity:.4}
 
+
+  /* more holographic effects */
+  .holo-ring{position:fixed;inset:0;z-index:-1;pointer-events:none;background:conic-gradient(from 0deg,transparent,rgba(62,242,255,.08),transparent,rgba(155,92,255,.06),transparent);animation:spin 40s linear infinite;opacity:.5}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .pulse-dot{position:absolute;width:6px;height:6px;border-radius:50%;background:var(--cyan);box-shadow:0 0 12px var(--cyan);animation:floatDot 8s ease-in-out infinite}
+  .pulse-dot:nth-child(odd){background:var(--pink);box-shadow:0 0 12px var(--pink);animation-delay:-4s}
+  @keyframes floatDot{0%,100%{transform:translate(0,0) scale(1);opacity:.7}50%{transform:translate(20px,-30px) scale(1.4);opacity:1}}
+  #list.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.6rem}
+  #list.grid .card{margin:0}
+  .view-toggle{display:flex;gap:.4rem;margin:.4rem 0}
+  .view-toggle button{flex:1;padding:.5rem;font-size:.85rem}
+  .view-toggle button.active{background:linear-gradient(120deg,var(--cyan),var(--violet));color:#04060f}
+  #quicksetup{background:linear-gradient(120deg,var(--lime),var(--cyan));color:#04060f;font-weight:800;box-shadow:0 0 28px rgba(93,255,176,.4)}
+
 </style>
 </head>
 <body>
@@ -142,6 +156,11 @@
 
     <div class="card" id="addcard">
       <h3>Add camera</h3>
+      <div class="view-toggle">
+        <button id="viewGrid" class="sec active">Grid view</button>
+        <button id="viewSingle" class="sec">Single view</button>
+      </div>
+      <button id="quicksetup">Quick setup – scan & add cameras</button>
       <input id="curl" placeholder="Camera IP (192.168.1.20), rtsp://…, http://…, or 0 for USB webcam" />
       <div class="row"><input id="cu" placeholder="Camera username (optional)" autocomplete="off" /><input id="cp" type="password" placeholder="Camera password" autocomplete="new-password" /></div>
       <div class="row">
@@ -350,6 +369,35 @@ $("phone").onclick = async () => {
     }, 1000);
     err(""); refresh();
   } catch (e) { err(e); }
+};
+
+// view mode
+const list = $("list");
+$("viewGrid").onclick = () => { list.className = "grid"; $("viewGrid").classList.add("active"); $("viewSingle").classList.remove("active"); };
+$("viewSingle").onclick = () => { list.className = ""; $("viewSingle").classList.add("active"); $("viewGrid").classList.remove("active"); };
+// quick setup: scan then try common credentials
+$("quicksetup").onclick = async () => {
+  $("found").textContent = "Scanning network and trying common logins…";
+  try {
+    const { devices } = await api("/discover");
+    if (!devices.length) { $("found").textContent = "No cameras found. Enter an IP manually."; return; }
+    const commons = ["", "admin", "admin:admin", "admin:12345", "admin:password", "admin:123456", "root:root"];
+    let added = 0;
+    for (const d of devices) {
+      for (const cred of commons) {
+        const [u, p] = cred.includes(":") ? cred.split(":",1) : [cred, ""];
+        try {
+          await api(`/cameras/${encodeURIComponent((d.brand||"cam")+"-"+d.ip.split(".").pop())}`, {
+            method: "POST",
+            body: JSON.stringify({ url: d.ip, brand: d.brand || "generic", username: u, password: p, threshold: +$("thr").value })
+          });
+          added++; break;
+        } catch(e) {}
+      }
+    }
+    $("found").textContent = `Quick setup finished. Added ${added} camera(s). Check the list above.`;
+    refresh();
+  } catch(e) { $("found").textContent = ""; err(e); }
 };
 $("out").onclick = () => { stopPhone(); setToken(null); };
 
