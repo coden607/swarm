@@ -265,8 +265,9 @@ _PROBE = (
 )
 
 
-def _ws_discovery(timeout: float = 3.0) -> set:
-    found = set()
+def _ws_discovery(timeout: float = 3.0) -> dict:
+    """ip -> raw ProbeMatch text (its ONVIF scopes usually name the maker)."""
+    found = {}
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         s.settimeout(0.5)
@@ -277,12 +278,45 @@ def _ws_discovery(timeout: float = 3.0) -> set:
                 data, addr = s.recvfrom(65535)
             except socket.timeout:
                 continue
-            found.add(addr[0])
+            found[addr[0]] = found.get(addr[0], "") + data[:8192].decode("utf-8", "ignore")
     except OSError:
         pass
     finally:
         s.close()
     return found
+
+
+BRAND_HINTS = (
+    ("hikvision", ("hikvision", "dnvrs-webs", "app-webs", "hikvision-webs", "ds-2cd")),
+    ("dahua", ("dahua", "dh-ipc", "dhip")),
+    ("amcrest", ("amcrest",)),
+    ("reolink", ("reolink",)),
+    ("axis", ("axis communications", "axis ", "/axis-cgi")),
+    ("foscam", ("foscam",)),
+    ("tapo", ("tapo", "tp-link", "tplink")),
+    ("unifi", ("unifi", "ubiquiti", "ubnt")),
+)
+
+
+def guess_brand(text: str) -> str:
+    t = (text or "").lower()
+    for brand, keys in BRAND_HINTS:
+        if any(k in t for k in keys):
+            return brand
+    return ""
+
+
+def _http_banner(host: str, port: int = 80, timeout: float = 1.2) -> str:
+    """Server header, auth realm and page title of the camera's web page (no credentials sent)."""
+    import urllib.error
+    try:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))  # LAN device: never via a proxy
+        r = opener.open(f"http://{host}:{port}/", timeout=timeout)
+        return f"{' '.join(r.headers.get_all('Server') or [])} {r.read(4096).decode('utf-8', 'ignore')}"
+    except urllib.error.HTTPError as e:
+        return f"{' '.join(e.headers.get_all('Server') or [])} {' '.join(e.headers.get_all('WWW-Authenticate') or [])}"
+    except Exception:
+        return ""
 
 
 def discover() -> list:
@@ -301,8 +335,12 @@ def discover() -> list:
         for h, op in ex.map(probe, [f"{prefix}.{i}" for i in range(1, 255) if f"{prefix}.{i}" != ip]):
             if op:
                 hosts[h] = {"ip": h, "ports": op, "onvif": False}
-        for h in scan.result():
+        ws = scan.result()
+        for h in ws:
             hosts.setdefault(h, {"ip": h, "ports": [], "onvif": True})["onvif"] = True
+        brands = dict(ex.map(lambda h: (h, guess_brand(ws.get(h, "") + " " + _http_banner(h))), list(hosts)))
     for v in hosts.values():
-        v["hint"] = "ONVIF camera" if v["onvif"] else ("RTSP camera" if set(v["ports"]) & {554, 8554} else "maybe phone 'IP Webcam' app")
+        v["brand"] = brands.get(v["ip"], "")
+        kind = "ONVIF camera" if v["onvif"] else ("RTSP camera" if set(v["ports"]) & {554, 8554} else "maybe phone 'IP Webcam' app")
+        v["hint"] = f"{v['brand'].capitalize()} {kind}" if v["brand"] else kind
     return sorted(hosts.values(), key=lambda v: tuple(int(x) for x in v["ip"].split(".")))

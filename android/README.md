@@ -1,7 +1,7 @@
 # Android
 
 ## A. Phone as a viewer (most people: no Termux)
-**Native app:** GitHub -> Actions -> latest `ci` run -> artifact **Swarm-apk** -> unzip, open `Swarm.apk` on the phone (allow "install unknown apps"), enter the server address. Gear button changes it. Live camera views and alerts while the app is open; for background push alerts use the Chrome app below.
+**Native app:** GitHub -> Actions -> latest `ci` run -> artifact **Swarm-apk** -> unzip, open `Swarm.apk` on the phone (allow "install unknown apps"), enter the server address. It finds your server automatically. After you sign in once it keeps watching in the background and sends a phone notification when a swarm starts, even with the app closed or after a reboot (gear button -> Background alerts ON/OFF).
 
 **Or Chrome web app:**
 A computer, mini PC or Pi at home already runs Swarm.
