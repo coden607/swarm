@@ -6,7 +6,6 @@ import shutil
 import subprocess
 import time
 from contextlib import asynccontextmanager
-from enum import Enum
 from pathlib import Path
 from typing import Dict, List
 
@@ -22,7 +21,7 @@ load_dotenv(ROOT / ".env")
 
 from . import events, push  # noqa: E402
 from .alert import trigger_alert  # noqa: E402
-from .detector import COOLDOWN, CameraProcessor  # noqa: E402
+from .detector import COOLDOWN, CONFIRM_HITS, CameraProcessor  # noqa: E402
 from .health import health_check  # noqa: E402
 from .sources import discover  # noqa: E402
 
@@ -37,7 +36,7 @@ TOKEN_TTL = int(float(os.getenv("SWARM_TOKEN_DAYS", "30")) * 86400)  # stay sign
 
 cameras: Dict[str, CameraProcessor] = {}
 settings = {"total_threshold": 0}  # 0 = combined-swarm alert off
-_state = {"last_total_alert": 0.0}
+_state = {"last_total_alert": 0.0, "above_since": 0.0}
 
 
 def _write(path: Path, obj) -> None:
@@ -57,16 +56,28 @@ def fresh_total() -> int:
     return sum(p.count for p in cameras.values() if p.fresh())
 
 
-def total_alarm() -> bool:
+def _over_total() -> bool:
     t = settings["total_threshold"]
     return t > 0 and fresh_total() >= t
 
 
+def total_alarm() -> bool:
+    """Combined swarm only after the count stays high, same bar as a single camera."""
+    if not _over_total() or not _state["above_since"]:
+        return False
+    return time.time() - _state["above_since"] >= max(0, CONFIRM_HITS - 1)
+
+
 def on_count(_proc) -> None:
-    if total_alarm() and time.time() - _state["last_total_alert"] > COOLDOWN:
-        _state["last_total_alert"] = time.time()
-        emails = sorted({e for p in cameras.values() for e in p.spec.get("alert_email_addresses", [])})
-        trigger_alert(fresh_total(), emails, "all cameras combined")
+    now = time.time()
+    if _over_total():
+        _state["above_since"] = _state["above_since"] or now
+        if total_alarm() and now - _state["last_total_alert"] > COOLDOWN:
+            _state["last_total_alert"] = now
+            emails = sorted({e for p in cameras.values() for e in p.spec.get("alert_email_addresses", [])})
+            trigger_alert(fresh_total(), emails, "all cameras combined")
+    else:
+        _state["above_since"] = 0.0
 
 
 def _start(cid: str, spec: dict) -> CameraProcessor:
@@ -119,23 +130,9 @@ app = FastAPI(title="Swarm Detection Service", lifespan=lifespan)
 bearer = HTTPBearer(auto_error=False)
 
 
-class CameraBrand(str, Enum):
-    GENERIC = "generic"
-    ONVIF = "onvif"
-    HIKVISION = "hikvision"
-    DAHUA = "dahua"
-    AMCREST = "amcrest"
-    AXIS = "axis"
-    REOLINK = "reolink"
-    TAPO = "tapo"
-    FOSCAM = "foscam"
-    UNIFI = "unifi"
-    PHONE = "phone"  # browser/phone camera pushing frames
-
-
 class CameraConfig(BaseModel):
     url: str = Field(..., description="IP/host, rtsp://, http:// (MJPEG or snapshot), USB index like 0, or 'phone'")
-    brand: CameraBrand = CameraBrand.GENERIC
+    brand: str = "generic"
     username: str = ""
     password: str = ""
     threshold: int = Field(10, ge=1, description="People count that triggers an alert")
@@ -171,7 +168,7 @@ def login(request: Request, username: str, password: str):
     recent = [t for t in _fails.get(ip, []) if now - t < 60]
     if len(recent) >= 5:
         raise HTTPException(status_code=429, detail="Too many attempts; wait a minute")
-    ok = secrets.compare_digest(username, ADMIN_USER) & secrets.compare_digest(password, ADMIN_PASS)
+    ok = len(username) == len(ADMIN_USER) and len(password) == len(ADMIN_PASS) and secrets.compare_digest(username, ADMIN_USER) and secrets.compare_digest(password, ADMIN_PASS)
     if not ok:
         _fails[ip] = recent + [now]
         raise HTTPException(status_code=401, detail="Bad credentials")

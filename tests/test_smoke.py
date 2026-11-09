@@ -12,6 +12,7 @@ os.environ["SWARM_DATA_DIR"] = tempfile.mkdtemp()
 os.environ["ADMIN_PASS"] = "testpass"
 os.environ["JWT_SECRET"] = "x" * 32
 os.environ["SWARM_ALERT_COOLDOWN"] = "0"
+os.environ["SWARM_CONFIRM_HITS"] = "2"
 os.environ["SWARM_SERVER_SOUND"] = "0"
 os.environ.pop("GEMINI_API_KEY", None)
 
@@ -97,7 +98,7 @@ def test_hog_runs_on_blank(jpeg):
 def test_snapshot_camera_autodetect_and_alarm(client, snapshot_server):
     r = client.post("/cameras/snap", json={"url": f"127.0.0.1:{snapshot_server}", "threshold": 3})
     assert r.status_code == 200
-    s = wait(lambda: next((c for c in client.get("/status").json()["cameras"] if c["id"] == "snap" and c["count"] == 5), None), 60)
+    s = wait(lambda: next((c for c in client.get("/status").json()["cameras"] if c["id"] == "snap" and c["count"] == 5 and c["alarm"]), None), 60)
     assert s, client.get("/status").json()
     assert s["alarm"] and "snapshot.jpg" in s["resolved"]
     assert client.get("/status").json()["alarm"] is True
@@ -111,7 +112,7 @@ def test_phone_camera_and_combined_threshold(client, jpeg):
     def total():
         client.post("/cameras/ph/frame", content=jpeg, headers={"Content-Type": "image/jpeg"})
         return client.get("/status").json()
-    st = wait(lambda: (lambda s: s if s["total"] >= 10 else None)(total()))
+    st = wait(lambda: (lambda s: s if s["total"] >= 10 and s["total_alarm"] else None)(total()), 30)
     assert st and st["total_alarm"] is True        # 5 (snap) + 5 (phone) >= 8, though each camera < its own threshold
     assert client.post("/cameras/snap/frame", content=jpeg).status_code == 400
 
@@ -161,8 +162,9 @@ def test_events_and_remote(client):
 
 
 def test_login_throttle(client):
+    assert client.post("/login", params={"username": "a", "password": "testpass"}).status_code == 401
     codes = [client.post("/login", params={"username": "admin", "password": "bad"}).status_code for _ in range(7)]
-    assert codes[:5] == [401] * 5 and codes[-1] == 429
+    assert codes[:4] == [401] * 4 and codes[-1] == 429
 
 
 def test_persistence_and_delete(client):
@@ -190,6 +192,19 @@ def test_yolox_counts_people():
     assert count(np.full((360, 640, 3), 90, np.uint8)) == 0
     if not hasattr(cv2, "HOGDescriptor"):
         assert isinstance(make_local(), YoloxCounter)
+
+
+def test_brand_family_paths_and_guesses():
+    from app.sources import candidates, family_of, guess_brand
+    lorex = candidates("10.0.0.8", "admin", "pw", "lorex")
+    assert lorex[0].endswith("/cam/realmonitor?channel=1&subtype=0")
+    assert family_of("annke") == "hikvision" and family_of("imou") == "dahua"
+    assert guess_brand("EZVIZ CS-C6N") == "ezviz"
+    assert guess_brand("Hanwha Wisenet") == "hanwha"
+    assert guess_brand("Uniview IPC") == "uniview"
+    from app.detector import first_int
+    assert first_int("about 1 or 2 people") == 1
+    assert first_int("none") == 0
 
 
 def test_brand_guess_from_banner():

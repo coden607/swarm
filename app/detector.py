@@ -1,5 +1,7 @@
 import hashlib
 import os
+import re
+import socket
 import threading
 import time
 import urllib.request
@@ -12,7 +14,24 @@ from .alert import trigger_alert
 from .sources import PushSource, open_first
 
 COOLDOWN = float(os.getenv("SWARM_ALERT_COOLDOWN", "60"))
+CONFIRM_HITS = max(1, int(os.getenv("SWARM_CONFIRM_HITS", "3")))
 STALE_AFTER = 15.0
+_model_error: str | None = None
+
+
+def internet_up(timeout: float = 2.0) -> bool:
+    """True only when a public host answers. A dead WAN must not block the local detector."""
+    try:
+        with socket.create_connection(("1.1.1.1", 443), timeout):
+            return True
+    except OSError:
+        return False
+
+
+def first_int(text: str) -> int:
+    """First integer in a model reply. Joining every digit would turn '1 or 2' into 12."""
+    m = re.search(r"\d+", text or "")
+    return int(m.group()) if m else 0
 
 
 class HogCounter:
@@ -34,7 +53,7 @@ class HogCounter:
         if len(rects) == 0:
             return 0
         boxes = [[int(x), int(y), int(a), int(b)] for x, y, a, b in rects]
-        keep = cv2.dnn.NMSBoxes(boxes, [float(s) for s in np.ravel(weights)], 0.3, 0.4)
+        keep = cv2.dnn.NMSBoxes(boxes, [float(s) for s in np.ravel(weights)], float(os.getenv("SWARM_HOG_CONF", "0.5")), 0.4)
         idx = np.array(keep).flatten() if len(keep) else []
         self.boxes = [tuple(int(v / k) for v in boxes[i]) for i in idx]
         return int(len(idx))
@@ -46,13 +65,26 @@ MODEL_PATH = Path(os.getenv("SWARM_MODEL_DIR", Path(__file__).resolve().parent.p
 
 
 def ensure_model() -> Path:
-    """Download the YOLOX-nano person model (3.6 MB, Apache-2.0) once; verified by SHA-256."""
+    """Download the YOLOX-nano person model (3.6 MB, Apache-2.0) once; verified by SHA-256.
+    A failed download is remembered so later cameras stay on HOG instead of hanging offline."""
+    global _model_error
     if MODEL_PATH.exists() and hashlib.sha256(MODEL_PATH.read_bytes()).hexdigest() == MODEL_SHA256:
+        _model_error = None
         return MODEL_PATH
+    if _model_error:
+        raise RuntimeError(_model_error)
+    if not internet_up():
+        _model_error = "person model is not cached and the network is down"
+        raise RuntimeError(_model_error)
     MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
-    data = urllib.request.urlopen(MODEL_URL, timeout=60).read()
+    try:
+        data = urllib.request.urlopen(MODEL_URL, timeout=12).read()
+    except Exception as e:
+        _model_error = f"person model download failed: {e}"
+        raise RuntimeError(_model_error) from e
     if hashlib.sha256(data).hexdigest() != MODEL_SHA256:
-        raise RuntimeError("person model download corrupted")
+        _model_error = "person model download corrupted"
+        raise RuntimeError(_model_error)
     tmp = MODEL_PATH.with_suffix(".part")
     tmp.write_bytes(data)
     tmp.replace(MODEL_PATH)
@@ -128,7 +160,7 @@ class GeminiCounter:
             "Count every distinct person visible in this image, including partially visible and distant people. Respond with only an integer.",
             {"mime_type": "image/jpeg", "data": buf.tobytes()},
         ])
-        return int("".join(c for c in r.text if c.isdigit()))
+        return first_int(getattr(r, "text", "") or "")
 
 
 class Counter:
@@ -163,13 +195,16 @@ class Counter:
     def count(self, frame) -> int:
         self._used_remote = False
         if self.remote and time.time() >= self.skip_until:
-            try:
-                n = self.remote.count(frame)
-                self._used_remote = True
-                return n
-            except Exception as e:
-                print(f"[detector] Gemini error ({e}); local fallback for 30s")
-                self.skip_until = time.time() + 30
+            if not internet_up():
+                self.skip_until = time.time() + 60
+            else:
+                try:
+                    n = self.remote.count(frame)
+                    self._used_remote = True
+                    return n
+                except Exception as e:
+                    print(f"[detector] Gemini error ({e}); local fallback for 120s")
+                    self.skip_until = time.time() + 120
         return self.local.count(frame)
 
 
@@ -190,6 +225,7 @@ class CameraProcessor:
         self.status = "starting"
         self.frame = None   # latest frame, for live view
         self.boxes = []
+        self.hit_run = 0  # consecutive counts at or above the threshold
 
     # -- public view
     url = property(lambda s: s.spec["url"])
@@ -205,7 +241,8 @@ class CameraProcessor:
 
     @property
     def alarm(self) -> bool:
-        return self.fresh() and self.count >= self.threshold
+        # One noisy frame must not page anyone. The count still updates immediately.
+        return self.fresh() and self.hit_run >= CONFIRM_HITS
 
     def snapshot_jpeg(self, width: int = 640):
         """Latest frame with detection boxes and count drawn on it (for the live view)."""
@@ -281,10 +318,11 @@ class CameraProcessor:
                     self.status = f"error: {e}"
                     continue
                 self.count, self.updated, self.boxes = n, time.time(), list(self.counter.boxes)
+                self.hit_run = self.hit_run + 1 if n >= self.threshold else 0
                 self.status = f"running ({self.counter.name})"
                 if self.on_count:
                     self.on_count(self)
-                if n >= self.threshold and time.time() - self.last_alert > COOLDOWN:
+                if self.hit_run >= CONFIRM_HITS and time.time() - self.last_alert > COOLDOWN:
                     self.last_alert = time.time()
                     trigger_alert(n, self.spec.get("alert_email_addresses", []), self.id)
             if not self.is_push:

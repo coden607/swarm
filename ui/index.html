@@ -164,10 +164,11 @@
       <input id="curl" placeholder="Camera IP (192.168.1.20), rtsp://…, http://…, or 0 for USB webcam" />
       <div class="row"><input id="cu" placeholder="Camera username (optional)" autocomplete="off" /><input id="cp" type="password" placeholder="Camera password" autocomplete="new-password" /></div>
       <div class="row">
-        <select id="brand"><option value="generic">Brand: auto‑detect</option><option>onvif</option><option>hikvision</option><option>dahua</option><option>amcrest</option><option>axis</option><option>reolink</option><option>tapo</option><option>foscam</option><option>unifi</option></select>
+        <select id="brand"><option value="generic">Brand: auto-detect</option><option>onvif</option><option>hikvision</option><option>annke</option><option>ezviz</option><option>dahua</option><option>amcrest</option><option>lorex</option><option>imou</option><option>axis</option><option>reolink</option><option>tapo</option><option>foscam</option><option>unifi</option><option>uniview</option><option>hanwha</option><option>vivotek</option><option>bosch</option><option>geovision</option><option>tvt</option><option>tiandy</option><option>honeywell</option><option>panasonic</option><option>sony</option><option>avigilon</option><option>speco</option><option>wyze</option><option>xmeye</option></select>
         <input id="thr" type="number" min="1" value="10" title="People that trigger an alert" />
       </div>
       <small id="tip"></small>
+      <small>Alerts wait until the count stays over the threshold, so a single bad frame stays quiet. Counting keeps running with no internet.</small>
       <input id="cid" placeholder="Name (optional, e.g. front-door)" />
       <button id="add">Add camera</button>
       <div class="row"><button id="scan" class="sec">Scan network for cameras</button><button id="phone" class="sec">Use this device's camera</button></div>
@@ -318,16 +319,31 @@ $("add").onclick = () => {
 const TIPS = {
   generic: "Most cameras: turn on ONVIF or RTSP in the camera's own app, then use the camera's username/password. Not supported (no local video): Ring, Nest, Arlo, Blink, most Eufy, stock Wyze.",
   onvif: "Use the camera's ONVIF user (some brands need ONVIF switched on in their app first).",
-  hikvision: "Hikvision: use the camera's admin login. RTSP is on by default.",
-  dahua: "Dahua: use the admin login. RTSP is on by default.",
-  amcrest: "Amcrest: use the admin login. RTSP is on by default.",
+  hikvision: "Hikvision and the same paths (Annke, HiLook, LaView, many Honeywell): camera admin login. RTSP is usually on.",
+  annke: "Annke uses Hikvision paths. Camera admin login.",
+  ezviz: "EZVIZ: enable RTSP in the EZVIZ app, then use the camera's verification code or local account.",
+  dahua: "Dahua and the same paths (Amcrest, Lorex, Imou): admin login. RTSP is usually on.",
+  amcrest: "Amcrest uses Dahua paths. Admin login.",
+  lorex: "Lorex uses Dahua paths. Admin login. Some Lorex recorders need RTSP turned on in the NVR.",
+  imou: "Imou uses Dahua paths. Enable RTSP in the Imou app, then use that local account.",
   axis: "Axis: use an Axis user account (viewer or admin).",
   reolink: "Reolink: if it won't connect, turn on RTSP/ONVIF in the Reolink app (network / advanced / server settings) and use the camera's admin login.",
   tapo: "Tapo: in the Tapo app open the camera > Settings > Advanced settings > Camera account, create a username/password and use that here (not your TP-Link login).",
   foscam: "Foscam: use the camera's admin account.",
   unifi: "UniFi Protect: enable RTSP for the camera in Protect (camera > Settings > Advanced), then paste the rtsp:// link here.",
+  uniview: "Uniview: admin login. RTSP/ONVIF is usually on.",
+  hanwha: "Hanwha / Wisenet / Samsung: admin login. ONVIF profile path is tried automatically.",
+  wyze: "Wyze only works with the RTSP firmware. Stock Wyze has no local stream.",
 };
 const showTip = b => { $("tip").textContent = TIPS[b] || TIPS.generic; };
+function setBrand(b) {
+  if (!b) return;
+  const s = $("brand");
+  if (![...s.options].some(o => o.value === b)) {
+    const o = document.createElement("option"); o.value = b; o.textContent = b; s.appendChild(o);
+  }
+  s.value = b; showTip(b);
+}
 $("brand").onchange = () => showTip($("brand").value); showTip("generic");
 $("scan").onclick = async () => {
   $("found").textContent = "Scanning your network (about 10 s)…";
@@ -349,7 +365,7 @@ $("scan").onclick = async () => {
       };
       $("found").appendChild(all);
     }
-    devices.forEach(d => { const b = document.createElement("button"); b.className = "sec"; b.textContent = `${have.has(d.ip) ? "Added: " : "Use "}${d.ip} – ${d.hint}`; b.disabled = have.has(d.ip); b.onclick = () => { $("curl").value = d.ip; if (d.brand) $("brand").value = d.brand; showTip(d.brand || $("brand").value); $("cu").focus(); }; $("found").appendChild(b); });
+    devices.forEach(d => { const b = document.createElement("button"); b.className = "sec"; b.textContent = `${have.has(d.ip) ? "Added: " : "Use "}${d.ip} – ${d.hint}`; b.disabled = have.has(d.ip); b.onclick = () => { $("curl").value = d.ip; if (d.brand) setBrand(d.brand); $("cu").focus(); }; $("found").appendChild(b); });
   } catch (e) { $("found").textContent = ""; err(e); }
 };
 function stopPhone() { clearInterval(phoneTimer); phoneTimer = null; const v = $("vid"); if (v.srcObject) v.srcObject.getTracks().forEach(t => t.stop()); v.srcObject = null; }

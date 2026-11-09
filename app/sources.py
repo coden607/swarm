@@ -22,27 +22,71 @@ import numpy as np
 
 os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", "rtsp_transport;tcp|timeout;5000000|stimeout;5000000")
 
-# (brand tag, path) - tag only changes ordering when the user picks a brand
+# OEM names share one path family. Tag on each path is that family.
+FAMILY = {
+    "annke": "hikvision", "ezviz": "hikvision", "hilook": "hikvision", "laview": "hikvision", "hik": "hikvision",
+    "amcrest": "dahua", "lorex": "dahua", "imou": "dahua", "cpplus": "dahua", "kbvision": "dahua", "empire": "dahua",
+    "unv": "uniview", "wisenet": "hanwha", "samsung": "hanwha", "techwin": "hanwha",
+    "tplink": "tapo", "tp-link": "tapo", "ubiquiti": "unifi", "ubnt": "unifi",
+    "xiongmai": "xmeye", "ipro": "panasonic", "i-pro": "panasonic", "honeywell": "hikvision",
+}
+
+
+def family_of(brand: str) -> str:
+    b = (brand or "generic").strip().lower()
+    return FAMILY.get(b, b or "generic")
+
+
+def path_rank(tag: str, brand: str) -> int:
+    """0 = this brand's own paths, 1 = same OEM family, 2 = everyone else."""
+    fam = family_of(brand)
+    if tag == (brand or "").strip().lower():
+        return 0
+    if tag == fam or (family_of(tag) == fam and fam != "generic"):
+        return 1
+    return 2
+
+
+# (brand tag, path). Chosen brand's family is tried first; every other path still runs.
 RTSP_PATHS = [
     ("hikvision", "Streaming/Channels/101"), ("hikvision", "Streaming/Channels/1"),
-    ("dahua", "cam/realmonitor?channel=1&subtype=0"), ("amcrest", "cam/realmonitor?channel=1&subtype=1"),
-    ("tapo", "stream1"), ("tapo", "stream2"),
-    ("reolink", "h264Preview_01_main"), ("reolink", "Preview_01_main"),
-    ("axis", "axis-media/media.amp"),
-    ("unifi", "live/ch0"), ("foscam", "videoMain"), ("generic", "live"),
-    ("generic", "live/main"), ("generic", "h264"), ("generic", "stream"), ("generic", "1"), ("generic", "11"),
-    ("generic", "cam1/h264"), ("generic", "onvif1"), ("generic", "MediaInput/h264"), ("generic", "av0_0"), ("generic", ""),
+    ("hikvision", "h264/ch1/main/av_stream"), ("hikvision", "h264/ch1/sub/av_stream"),
     ("hikvision", "ISAPI/Streaming/channels/101"), ("hikvision", "Streaming/Channels/102"),
-    ("reolink", "h264Preview_01_sub"), ("foscam", "videoSub"), ("foscam", "live/ch00_0"),
-    ("samsung", "profile1/media.smp"), ("samsung", "onvif/profile2/media.smp"), ("vivotek", "live.sdp"), ("vivotek", "live1s1.sdp"),
+    ("ezviz", "h264_stream"),
+    ("dahua", "cam/realmonitor?channel=1&subtype=0"), ("dahua", "cam/realmonitor?channel=1&subtype=1"),
+    ("tapo", "stream1"), ("tapo", "stream2"),
+    ("reolink", "h264Preview_01_main"), ("reolink", "Preview_01_main"), ("reolink", "h264Preview_01_sub"),
+    ("axis", "axis-media/media.amp"), ("axis", "axis-media/media.amp?videocodec=h264"),
+    ("unifi", "live/ch0"), ("unifi", "live/ch00_0"),
+    ("foscam", "videoMain"), ("foscam", "videoSub"), ("foscam", "live/ch00_0"),
+    ("uniview", "media/video1"), ("uniview", "media/video2"), ("uniview", "unicast/c1/s0/live"),
+    ("hanwha", "profile1/media.smp"), ("hanwha", "profile2/media.smp"), ("hanwha", "onvif/profile1/media.smp"),
+    ("vivotek", "live.sdp"), ("vivotek", "live1s1.sdp"), ("vivotek", "live2.sdp"),
+    ("bosch", "rtsp_tunnel"), ("bosch", "video?inst=1"),
+    ("geovision", "CH001.sdp"), ("geovision", "media/media.amp"),
+    ("tvt", "chID=1&streamType=main"), ("tvt", "profile1"),
+    ("tiandy", "1/1"), ("tiandy", "Streaming/Channels/101"),
+    ("panasonic", "MediaInput/h264"), ("panasonic", "nphMpeg4/g726-640x480"),
+    ("sony", "media/video1"), ("sony", "image1"),
+    ("avigilon", "defaultPrimary?streamType=u"), ("avigilon", "hiQ1"),
+    ("speco", "profile1"), ("wyze", "live"),
     ("xmeye", "user={u}&password={p}&channel=1&stream=0.sdp?real_stream"), ("xmeye", "ch01/0"),
-    ("generic", "stream/main"), ("generic", "stream0"), ("generic", "video1"), ("generic", "play1.sdp"), ("generic", "ch0_0.h264"),
-    ("generic", "mpeg4/media.amp"), ("generic", "live/ch00_1"), ("generic", "0/onvif/profile1/media.smp"),
+    ("generic", "live"), ("generic", "live/main"), ("generic", "h264"), ("generic", "stream"),
+    ("generic", "1"), ("generic", "11"), ("generic", "cam1/h264"), ("generic", "onvif1"),
+    ("generic", "MediaInput/h264"), ("generic", "av0_0"), ("generic", ""),
+    ("generic", "stream/main"), ("generic", "stream0"), ("generic", "video1"), ("generic", "play1.sdp"),
+    ("generic", "ch0_0.h264"), ("generic", "mpeg4/media.amp"), ("generic", "live/ch00_1"),
+    ("generic", "0/onvif/profile1/media.smp"),
 ]
 HTTP_PATHS = [
-    "video.mjpg", "mjpg/video.mjpg", "videostream.cgi", "video", "stream.mjpg", "mjpeg", "?action=stream",
-    "snapshot.jpg", "cgi-bin/snapshot.cgi", "image/jpeg.cgi", "shot.jpg", "axis-cgi/jpg/image.cgi",
-    "tmpfs/auto.jpg", "?action=snapshot", "image.jpg",
+    ("axis", "axis-cgi/mjpg/video.cgi"), ("axis", "mjpg/video.mjpg"), ("axis", "axis-cgi/jpg/image.cgi"),
+    ("hikvision", "ISAPI/Streaming/channels/101/httpPreview"),
+    ("dahua", "cgi-bin/mjpg/video.cgi"), ("dahua", "cgi-bin/snapshot.cgi"),
+    ("foscam", "videostream.cgi"),
+    ("generic", "video.mjpg"), ("generic", "mjpg/video.mjpg"), ("generic", "video"),
+    ("generic", "stream.mjpg"), ("generic", "mjpeg"), ("generic", "?action=stream"),
+    ("generic", "snapshot.jpg"), ("generic", "image/jpeg.cgi"), ("generic", "shot.jpg"),
+    ("generic", "tmpfs/auto.jpg"), ("generic", "?action=snapshot"), ("generic", "image.jpg"),
 ]
 SNAP_RE = re.compile(r"(snapshot|shot\.jpg|image/jpeg|jpeg\.cgi|image\.jpg|auto\.jpg|\.jpe?g|image\.cgi|action=snapshot)", re.I)
 
@@ -68,13 +112,18 @@ def candidates(addr: str, user: str = "", pw: str = "", brand: str = "generic") 
         hp = addr.split("/")[0]
         host, _, ps = hp.partition(":")
         port = int(ps) if ps.isdigit() else None
-    rt = sorted(RTSP_PATHS, key=lambda t: t[0] != brand)  # stable: chosen brand first
+    rt = sorted(RTSP_PATHS, key=lambda t: path_rank(t[0], brand))
+    http = sorted(HTTP_PATHS, key=lambda t: path_rank(t[0], brand))
     if "rtsp" in schemes:
-        out += [f"rtsp://{cred}{host}:{port or 554}/" + path.replace("{u}", quote(user, safe="")).replace("{p}", quote(pw, safe=""))
+        rtsp_port = port or (10554 if family_of(brand) == "reolink" else 554)
+        out += [f"rtsp://{cred}{host}:{rtsp_port}/" + path.replace("{u}", quote(user, safe="")).replace("{p}", quote(pw, safe=""))
                 for _, path in rt]
+        if family_of(brand) == "reolink" and port is None:
+            out += [f"rtsp://{cred}{host}:554/" + path.replace("{u}", quote(user, safe="")).replace("{p}", quote(pw, safe=""))
+                    for tag, path in rt if path_rank(tag, brand) <= 1]
     if "http" in schemes:
         for hp_ in ([port] if port else [80, 8080]):
-            out += [f"http://{cred}{host}:{hp_}/{path}" for path in HTTP_PATHS]
+            out += [f"http://{cred}{host}:{hp_}/{path}" for _, path in http]
     return list(dict.fromkeys(out))
 
 
@@ -287,14 +336,32 @@ def _ws_discovery(timeout: float = 3.0) -> dict:
 
 
 BRAND_HINTS = (
-    ("hikvision", ("hikvision", "dnvrs-webs", "app-webs", "hikvision-webs", "ds-2cd")),
-    ("dahua", ("dahua", "dh-ipc", "dhip")),
     ("amcrest", ("amcrest",)),
     ("reolink", ("reolink",)),
+    ("ezviz", ("ezviz",)),
+    ("annke", ("annke",)),
+    ("imou", ("imou",)),
+    ("lorex", ("lorex",)),
+    ("hikvision", ("hikvision", "dnvrs-webs", "app-webs", "hikvision-webs", "ds-2cd", "hilook", "laview")),
+    ("dahua", ("dahua", "dh-ipc", "dhip", "cp plus", "cp-plus", "kbvision")),
     ("axis", ("axis communications", "axis ", "/axis-cgi")),
     ("foscam", ("foscam",)),
     ("tapo", ("tapo", "tp-link", "tplink")),
     ("unifi", ("unifi", "ubiquiti", "ubnt")),
+    ("uniview", ("uniview", "unv")),
+    ("hanwha", ("hanwha", "wisenet", "samsung techwin", "samsung")),
+    ("vivotek", ("vivotek",)),
+    ("bosch", ("bosch",)),
+    ("geovision", ("geovision", "geo-vision")),
+    ("tvt", ("tvt", "provision-isr")),
+    ("tiandy", ("tiandy",)),
+    ("honeywell", ("honeywell",)),
+    ("panasonic", ("panasonic", "i-pro")),
+    ("sony", ("sony",)),
+    ("avigilon", ("avigilon",)),
+    ("speco", ("speco",)),
+    ("wyze", ("wyze",)),
+    ("xmeye", ("xmeye", "xiongmai")),
 )
 
 
@@ -323,7 +390,7 @@ def discover() -> list:
     """ONVIF WS-Discovery + RTSP/MJPEG port scan of the local /24."""
     ip = local_ip()
     prefix = ip.rsplit(".", 1)[0]
-    ports = (554, 8554, 8080)
+    ports = (554, 8554, 10554, 8080)
     hosts = {}
 
     def probe(h):
@@ -341,6 +408,6 @@ def discover() -> list:
         brands = dict(ex.map(lambda h: (h, guess_brand(ws.get(h, "") + " " + _http_banner(h))), list(hosts)))
     for v in hosts.values():
         v["brand"] = brands.get(v["ip"], "")
-        kind = "ONVIF camera" if v["onvif"] else ("RTSP camera" if set(v["ports"]) & {554, 8554} else "maybe phone 'IP Webcam' app")
+        kind = "ONVIF camera" if v["onvif"] else ("RTSP camera" if set(v["ports"]) & {554, 8554, 10554} else "maybe phone 'IP Webcam' app")
         v["hint"] = f"{v['brand'].capitalize()} {kind}" if v["brand"] else kind
     return sorted(hosts.values(), key=lambda v: tuple(int(x) for x in v["ip"].split(".")))
