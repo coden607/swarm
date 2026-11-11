@@ -8,7 +8,7 @@ iOS can't run the detection service. The iPhone is a viewer/controller: live cam
 3. Push alerts need the **https** link and iOS 16.4+: open from the Home Screen icon, tap **Enable alerts**.
 
 ## 2. Native app without a Mac (sideload)
-1. GitHub -> Actions -> latest `ci` run -> artifact **Swarm-unsigned-ipa** -> download and unzip.
+1. Download [Swarm-unsigned.ipa](https://github.com/coden607/swarm/releases/download/apk/Swarm-unsigned.ipa) (rebuilt on each push to `main`), or GitHub -> Actions -> latest `ci` run -> artifact **Swarm-unsigned-ipa**.
 2. Install with [Sideloadly](https://sideloadly.io) or [AltStore](https://altstore.io) using a free Apple ID (re-sign every 7 days).
 3. Settings -> General -> VPN & Device Management -> trust your Apple ID.
 4. First launch asks for the server address (e.g. `192.168.1.20:8000`).
