@@ -25,7 +25,7 @@ def add(label: str, count: int, kind: str = "alert") -> None:
         try:
             _DATA.mkdir(parents=True, exist_ok=True)
             write_json(_FILE, list(_events))
-        except OSError:
+        except Exception:
             pass
 
 

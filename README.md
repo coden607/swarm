@@ -26,7 +26,7 @@ curl -fsSL https://raw.githubusercontent.com/coden607/swarm/main/install.sh | sh
 irm https://raw.githubusercontent.com/coden607/swarm/main/install.ps1 | iex
 ```
 
-No Docker. The installer sets up Python + dependencies, creates `.env` (random admin password), starts an auto‑restarting service, puts a **Swarm Detection icon on your Desktop / app menu / Start Menu**, and prints the URL, login and a QR code.
+No Docker. The installer sets up Python 3.9+ and dependencies, creates `.env` (random admin password), starts an auto‑restarting service, puts a **Swarm Detection icon on your Desktop / app menu / Start Menu**, and prints the URL, login and a QR code.
 
 Add `SWARM_REMOTE=1` before the command to also get a public https link you can open from anywhere (login still required): `SWARM_REMOTE=1 curl -fsSL … | sh` / `$env:SWARM_REMOTE=1; irm … | iex`.
 

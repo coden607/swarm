@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import re
@@ -165,7 +166,10 @@ def login(request: Request, username: str, password: str):
     recent = [t for t in _fails.get(ip, []) if now - t < 60]
     if len(recent) >= 5:
         raise HTTPException(status_code=429, detail="Too many attempts; wait a minute")
-    ok = len(username) == len(ADMIN_USER) and len(password) == len(ADMIN_PASS) and secrets.compare_digest(username, ADMIN_USER) and secrets.compare_digest(password, ADMIN_PASS)
+    def _same(left: str, right: str) -> bool:
+        return secrets.compare_digest(hashlib.sha256(left.encode()).digest(), hashlib.sha256(right.encode()).digest())
+
+    ok = _same(username, ADMIN_USER) and _same(password, ADMIN_PASS)
     if not ok:
         _fails[ip] = recent + [now]
         raise HTTPException(status_code=401, detail="Bad credentials")
