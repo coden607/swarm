@@ -13,6 +13,7 @@ from typing import Dict, List
 import jwt
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.responses import FileResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -316,6 +317,12 @@ def remote(_: str = Depends(require_auth)):
 @app.get("/discover")
 def discover_cameras(_: str = Depends(require_auth)):
     return {"devices": discover()}
+
+
+@app.get("/install")
+def install_page():
+    """Phone installer. No login, so an iPhone can open it before the dashboard is set up."""
+    return FileResponse(ROOT / "installer.html", media_type="text/html")
 
 
 # Static UI last so it never shadows API routes

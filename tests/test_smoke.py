@@ -134,6 +134,13 @@ def test_xmeye_template_gets_credentials():
     assert _mask("rtsp://admin:secret@10.0.0.9/live") == "rtsp://***@10.0.0.9/live"
 
 
+def test_iphone_install_page(client):
+    r = client.get("/install")
+    assert r.status_code == 200
+    assert "://install?url=" in r.text
+    assert "Apple ID" in r.text
+
+
 def test_login_accepts_json_body(client):
     r = client.post("/login", json={"username": "admin", "password": "testpass"})
     assert r.status_code == 200 and r.json().get("access_token")

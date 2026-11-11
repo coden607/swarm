@@ -9,7 +9,7 @@ Download one file, double‑click it, done (it installs, adds a desktop icon, st
 - **Linux:** [Install-Linux.sh](https://github.com/coden607/swarm/raw/main/Install-Linux.sh)
 - **Kali:** [Install Swarm on Kali](https://github.com/coden607/swarm/raw/main/Install-Kali.desktop) (or [Install-Kali.sh](https://github.com/coden607/swarm/raw/main/Install-Kali.sh)). Open it, allow the terminal, and the dashboard starts at http://localhost:8000.
 - **Android:** [Swarm.apk](https://github.com/coden607/swarm/releases/download/apk/Swarm.apk) — open the file to install (allow installs from your browser once). It finds your server and keeps swarm alerts on in the background. To run the server on the phone, install Termux from F‑Droid and use the one‑liner below.
-- **iPhone/iPad (one tap):** with [SideStore](https://sidestore.io) or [AltStore](https://altstore.io) installed once, tap [Install with SideStore](sidestore://install?url=https%3A%2F%2Fgithub.com%2Fcoden607%2Fswarm%2Freleases%2Fdownload%2Fapk%2FSwarm-unsigned.ipa) or [Install with AltStore](altstore://install?url=https%3A%2F%2Fgithub.com%2Fcoden607%2Fswarm%2Freleases%2Fdownload%2Fapk%2FSwarm-unsigned.ipa). Confirm, then trust the app in Settings → General → VPN & Device Management. Open Swarm and enter the server address.
+- **iPhone/iPad:** open [the installer](https://cdn.jsdelivr.net/gh/coden607/swarm@main/installer.html) in Safari and tap **Continue with this iPhone's Apple ID**. It opens SideStore (or AltStore) and installs Swarm with the Apple ID already saved there. Use this phone's Apple ID if that app asks. Then trust the app under Settings → General → VPN & Device Management. Swarm finds the server on Wi‑Fi by itself. A server you already run also serves this page at `http://<server>:8000/install`.
 - **iPhone/iPad (no extra app):** open the server's **https** link in Safari → Share → Add to Home Screen → open it from the Home Screen → **Enable alerts on this device** (iOS 16.4+).
 
 On first open with no cameras it scans your network automatically; tap a result, add the camera's login if it has one, and you're counting.
@@ -55,7 +55,7 @@ Cameras reconnect automatically and are remembered across restarts.
 - **Desktop icon:** created by the installer.
 - **Android app:** [Swarm.apk](https://github.com/coden607/swarm/releases/download/apk/Swarm.apk) — open the file to install.
 - **Android / desktop Chrome/Edge:** open the URL → **Install app**.
-- **iPhone/iPad:** [one-tap SideStore install](sidestore://install?url=https%3A%2F%2Fgithub.com%2Fcoden607%2Fswarm%2Freleases%2Fdownload%2Fapk%2FSwarm-unsigned.ipa) or [AltStore](altstore://install?url=https%3A%2F%2Fgithub.com%2Fcoden607%2Fswarm%2Freleases%2Fdownload%2Fapk%2FSwarm-unsigned.ipa). Safari → Share → Add to Home Screen still works with no extra app.
+- **iPhone/iPad:** [guided installer](https://cdn.jsdelivr.net/gh/coden607/swarm@main/installer.html). It uses the Apple ID saved in SideStore or AltStore. Safari → Share → Add to Home Screen still works with no extra app.
 
 ## Options (env vars)
 `SWARM_HOME` · `SWARM_PORT` · `GEMINI_API_KEY` · `SWARM_REMOTE=1` · `SWARM_HTTPS=1` · `SWARM_NO_START=1` · `SWARM_NO_SERVICE=1` · `SWARM_NO_ICON=1`

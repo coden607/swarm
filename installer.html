@@ -39,7 +39,7 @@
     win: { name: 'Windows', cmd: `irm ${RAW}/install.ps1 | iex`,
       steps: 'Open PowerShell (Administrator recommended so the firewall port opens), paste, press Enter. Adds a Desktop and Start Menu icon.' },
     ios: { name: 'iPhone / iPad', cmd: '',
-      steps: 'The green buttons install the Swarm app in one tap. SideStore or AltStore has to be on the phone already (free Apple ID, once). After it opens, confirm the install, then trust the app under Settings → General → VPN & Device Management. Open Swarm and enter the server address. Without SideStore or AltStore, open the server in Safari and use Share → Add to Home Screen.' }
+      steps: '' }
   };
   const ua = navigator.userAgent || '';
   let key = /iPad|iPhone|iPod/.test(ua) ? 'ios' : /Android/.test(ua) ? 'android' : /Win/.test(ua) ? 'win' : 'unix';
@@ -48,19 +48,54 @@
     document.getElementById('detected').textContent = 'Detected / selected: ' + o.name;
     document.getElementById('cmd').textContent = o.cmd;
     document.getElementById('steps').textContent = o.steps;
-    const ipa = encodeURIComponent('https://github.com/coden607/swarm/releases/download/apk/Swarm-unsigned.ipa');
-    const source = encodeURIComponent('https://raw.githubusercontent.com/coden607/swarm/main/ios/altstore.json');
-    const actions = document.getElementById('actions');
     const ios = k === 'ios';
     document.getElementById('cmd').hidden = ios;
     document.getElementById('copy').hidden = ios;
-    actions.hidden = !ios;
-    actions.innerHTML = ios ? `<a class="go" href="sidestore://install?url=${ipa}">Install with SideStore</a>
-      <a class="go" href="altstore://install?url=${ipa}">Install with AltStore</a>
-      <a class="go" href="sidestore://source?url=${source}">Add the Swarm source</a>
-      <p class="hint">First time only: <a href="https://sidestore.io">get SideStore</a> (stays on the phone) or <a href="https://altstore.io">AltStore</a>, then tap Install again.</p>` : '';
+    document.getElementById('actions').hidden = !ios;
     document.getElementById('termux').style.display = k === 'android' ? 'block' : 'none';
+    if (ios) renderIos();
   }
+  const IPA = encodeURIComponent('https://github.com/coden607/swarm/releases/download/apk/Swarm-unsigned.ipa');
+  let iosStep = 0, leftApp = false, missed = false;
+  function openSigner(scheme) {
+    leftApp = false;
+    missed = false;
+    iosStep = 1;
+    renderIos();
+    location.href = scheme + '://install?url=' + IPA;
+    setTimeout(() => { if (!leftApp && iosStep === 1) { missed = true; renderIos(); } }, 1400);
+  }
+  function renderIos() {
+    const actions = document.getElementById('actions');
+    const signIn = 'Uses the Apple ID already saved in SideStore or AltStore. If that app asks you to sign in, use the same Apple ID this iPhone uses. Swarm never sees the password.';
+    if (iosStep === 0) {
+      actions.innerHTML = `<button type="button" id="go-side">Continue with this iPhone's Apple ID</button>
+        <p class="hint">${signIn} SideStore opens and installs Swarm. Confirm the install there.</p>
+        <p class="hint">No SideStore yet? <a href="https://sidestore.io">Install SideStore</a> once, sign in with this phone's Apple ID, then come back and tap the button.</p>`;
+      document.getElementById('go-side').onclick = () => openSigner('sidestore');
+    } else if (iosStep === 1) {
+      actions.innerHTML = missed
+        ? `<p class="hint">SideStore did not open. Install it, sign in with this iPhone's Apple ID, then try again. Or use AltStore if that is what you already sign in to.</p>
+           <button type="button" id="go-side">Try SideStore again</button>
+           <button type="button" id="go-alt">Continue in AltStore</button>
+           <a class="go" href="https://sidestore.io">Get SideStore</a>`
+        : `<p class="hint">SideStore should be open. Confirm the install. If it asks for an Apple ID, use the one already on this iPhone. Come back here when the app is on the Home Screen.</p>`;
+      const side = document.getElementById('go-side');
+      const alt = document.getElementById('go-alt');
+      if (side) side.onclick = () => openSigner('sidestore');
+      if (alt) alt.onclick = () => openSigner('altstore');
+    } else if (iosStep === 2) {
+      actions.innerHTML = `<p class="hint">Apple requires one tap that no app can do for you. Open Settings → General → VPN &amp; Device Management, tap the Apple ID that signed Swarm, then Trust.</p>
+        <button type="button" id="trusted">I trusted Swarm</button>`;
+      document.getElementById('trusted').onclick = () => { iosStep = 3; renderIos(); };
+    } else {
+      actions.innerHTML = `<p class="hint">Open Swarm on the Home Screen. It looks for your server on the Wi‑Fi by itself. A free Apple ID expires the app in about 7 days; open SideStore or AltStore and it refreshes with the same saved login.</p>`;
+    }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') leftApp = true;
+    if (document.visibilityState === 'visible' && leftApp && iosStep === 1) { iosStep = 2; renderIos(); }
+  });
   document.querySelectorAll('[data-os]').forEach(a => a.onclick = e => { e.preventDefault(); show(a.dataset.os); });
   document.getElementById('copy').onclick = () => {
     navigator.clipboard.writeText(document.getElementById('cmd').textContent).then(
