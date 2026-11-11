@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import re
@@ -24,6 +25,7 @@ from .alert import trigger_alert  # noqa: E402
 from .detector import COOLDOWN, CONFIRM_HITS, CameraProcessor  # noqa: E402
 from .health import health_check  # noqa: E402
 from .sources import discover  # noqa: E402
+from .storage import write_json  # noqa: E402
 
 DATA = Path(os.getenv("SWARM_DATA_DIR", ROOT / "data"))
 DATA.mkdir(parents=True, exist_ok=True)
@@ -40,11 +42,7 @@ _state = {"last_total_alert": 0.0, "above_since": 0.0}
 
 
 def _write(path: Path, obj) -> None:
-    path.write_text(json.dumps(obj, indent=2))
-    try:
-        path.chmod(0o600)  # may hold camera passwords
-    except OSError:
-        pass
+    write_json(path, obj)
 
 
 def _save() -> None:
@@ -160,7 +158,15 @@ _fails: Dict[str, List[float]] = {}
 
 
 @app.post("/login")
-def login(request: Request, username: str, password: str):
+async def login(request: Request, username: str = "", password: str = ""):
+    if request.headers.get("content-type", "").split(";")[0].strip() == "application/json":
+        try:
+            data = await request.json()
+        except Exception:
+            data = {}
+        if isinstance(data, dict):
+            username = str(data.get("username") or username or "")
+            password = str(data.get("password") if data.get("password") is not None else password)
     if not ADMIN_PASS:
         raise HTTPException(status_code=503, detail="ADMIN_PASS not set in .env")
     ip = request.headers.get("cf-connecting-ip") or (request.client.host if request.client else "?")
@@ -168,7 +174,10 @@ def login(request: Request, username: str, password: str):
     recent = [t for t in _fails.get(ip, []) if now - t < 60]
     if len(recent) >= 5:
         raise HTTPException(status_code=429, detail="Too many attempts; wait a minute")
-    ok = len(username) == len(ADMIN_USER) and len(password) == len(ADMIN_PASS) and secrets.compare_digest(username, ADMIN_USER) and secrets.compare_digest(password, ADMIN_PASS)
+    def _same(left: str, right: str) -> bool:
+        return secrets.compare_digest(hashlib.sha256(left.encode()).digest(), hashlib.sha256(right.encode()).digest())
+
+    ok = _same(username, ADMIN_USER) and _same(password, ADMIN_PASS)
     if not ok:
         _fails[ip] = recent + [now]
         raise HTTPException(status_code=401, detail="Bad credentials")

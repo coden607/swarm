@@ -24,7 +24,7 @@ Set-Location $Home_
 
 # 2. python
 function Find-Py {
-  foreach ($c in @('py -3', 'python', 'python3')) {
+  foreach ($c in @('py -3.14', 'py -3.13', 'py -3.12', 'py -3.11', 'py -3.10', 'py -3', 'python', 'python3')) {
     $exe = $c.Split(' ')[0]
     if (Get-Command $exe -ErrorAction SilentlyContinue) {
       try { & $exe $c.Split(' ')[1..9] -c "import sys; sys.exit(0 if sys.version_info >= (3,9) else 1)" 2>$null; if ($LASTEXITCODE -eq 0) { return $c } } catch {}

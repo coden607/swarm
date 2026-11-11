@@ -11,3 +11,4 @@ swarm.pid
 .pytest_cache/
 swarm.err.log
 models/
+.continuity/

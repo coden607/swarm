@@ -5,6 +5,8 @@ import os
 import threading
 from pathlib import Path
 
+from .storage import write_json
+
 _DATA = Path(os.getenv("SWARM_DATA_DIR", Path(__file__).resolve().parent.parent / "data"))
 KEY_FILE, SUB_FILE = _DATA / "vapid_private.pem", _DATA / "push.json"
 CLAIM_SUB = os.getenv("SWARM_PUSH_SUB", "https://github.com/coden607/swarm")
@@ -41,11 +43,7 @@ def subscriptions() -> list:
 
 def _write(subs: list) -> None:
     _DATA.mkdir(parents=True, exist_ok=True)
-    SUB_FILE.write_text(json.dumps(subs))
-    try:
-        SUB_FILE.chmod(0o600)
-    except OSError:
-        pass
+    write_json(SUB_FILE, subs)
 
 
 def add(sub: dict) -> None:

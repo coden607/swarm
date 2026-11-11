@@ -275,7 +275,7 @@ def open_first(addr: str, user: str = "", pw: str = "", brand: str = "generic") 
             winner, url = f.result(), c
         except Exception:
             winner = None
-    ex.shutdown(wait=False)
+    ex.shutdown(wait=True)
     if winner is None and user and "://" not in addr and not addr.isdigit():
         try:  # last resort: ask the camera itself via ONVIF for its stream URI
             from .brands import _discover_onvif_rtsp
@@ -291,7 +291,9 @@ def open_first(addr: str, user: str = "", pw: str = "", brand: str = "generic") 
 
 
 def _mask(url: str) -> str:
-    return re.sub(r"//[^/@]*@", "//***@", url)
+    url = re.sub(r"//[^/@]*@", "//***@", url)
+    url = re.sub(r"(?i)(password=)[^&/]*", r"\1***", url)
+    return re.sub(r"(?i)(user=)[^&/]*", r"\1***", url)
 
 
 # ------------------------------------------------------------------ discovery

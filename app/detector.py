@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib
 import os
 import re
@@ -321,7 +323,10 @@ class CameraProcessor:
                 self.hit_run = self.hit_run + 1 if n >= self.threshold else 0
                 self.status = f"running ({self.counter.name})"
                 if self.on_count:
-                    self.on_count(self)
+                    try:
+                        self.on_count(self)
+                    except Exception as e:
+                        print(f"[detector] alert callback failed: {e}")
                 if self.hit_run >= CONFIRM_HITS and time.time() - self.last_alert > COOLDOWN:
                     self.last_alert = time.time()
                     trigger_alert(n, self.spec.get("alert_email_addresses", []), self.id)

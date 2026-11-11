@@ -6,6 +6,8 @@ import time
 from collections import deque
 from pathlib import Path
 
+from .storage import write_json
+
 _DATA = Path(os.getenv("SWARM_DATA_DIR", Path(__file__).resolve().parent.parent / "data"))
 _FILE = _DATA / "events.json"
 _lock = threading.Lock()
@@ -22,8 +24,8 @@ def add(label: str, count: int, kind: str = "alert") -> None:
         _events.append({"ts": time.time(), "kind": kind, "label": label or "all", "count": int(count)})
         try:
             _DATA.mkdir(parents=True, exist_ok=True)
-            _FILE.write_text(json.dumps(list(_events)))
-        except OSError:
+            write_json(_FILE, list(_events))
+        except Exception:
             pass
 
 
