@@ -146,6 +146,11 @@ def test_iphone_install_page(client):
     assert "altstore://install?url=" in r.text
     assert "docs.sidestore.io/docs/installation/install" in r.text
     assert "installSideStore" in r.text
+    assert "I trusted Swarm" in r.text
+    assert "iloader.app" in r.text
+    assert "Allow from this source" in r.text
+    assert "More info" in r.text
+    assert "right‑click" in r.text or "right-click" in r.text
 
 
 def test_iphone_one_click_profile(client):
