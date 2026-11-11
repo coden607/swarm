@@ -102,3 +102,29 @@ jobs:
       - run: pip install -r requirements.txt pytest httpx scikit-image && pip install -U "opencv-python-headless>=5"
       - run: python -c "import cv2; print(cv2.__version__); assert not hasattr(cv2, 'HOGDescriptor')"
       - run: python -m pytest -q
+  publish-downloads:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [android-apk, ios-ipa]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: Swarm-*
+          merge-multiple: true
+      - name: Publish Android and iOS builds
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          apk=$(find . -name 'Swarm.apk' -print -quit)
+          ipa=$(find . -name 'Swarm-unsigned.ipa' -print -quit)
+          test -s "$apk"
+          test -s "$ipa"
+          cp "$apk" /tmp/Swarm.apk
+          cp "$ipa" /tmp/Swarm-unsigned.ipa
+          gh release upload apk /tmp/Swarm.apk /tmp/Swarm-unsigned.ipa --clobber --repo "$GITHUB_REPOSITORY"
+          gh release edit apk --repo "$GITHUB_REPOSITORY" \
+            --title "Swarm Android and iOS" \
+            --notes "Built from ${GITHUB_SHA}. Swarm.apk is the Android app. Swarm-unsigned.ipa is the unsigned iPhone package."
