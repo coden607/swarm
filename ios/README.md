@@ -7,15 +7,12 @@ iOS can't run the detection service. The iPhone is a viewer/controller: live cam
 2. Share -> **Add to Home Screen**. Open Swarm from the icon.
 3. Push alerts need the **https** link and iOS 16.4+: open from the Home Screen icon, tap **Enable alerts**.
 
-## 2. Native app, one tap
-Install [SideStore](https://sidestore.io) or [AltStore](https://altstore.io) once (free Apple ID). Then tap:
+## 2. Native app
+Open [the installer](https://cdn.jsdelivr.net/gh/coden607/swarm@main/installer.html) in Safari. Tap **Continue with this iPhone's Apple ID**. SideStore opens and signs Swarm with the Apple ID already saved in SideStore. If SideStore asks you to sign in, use the same Apple ID this phone uses. Swarm does not ask for the password.
 
-- [Install with SideStore](sidestore://install?url=https%3A%2F%2Fgithub.com%2Fcoden607%2Fswarm%2Freleases%2Fdownload%2Fapk%2FSwarm-unsigned.ipa)
-- [Install with AltStore](altstore://install?url=https%3A%2F%2Fgithub.com%2Fcoden607%2Fswarm%2Freleases%2Fdownload%2Fapk%2FSwarm-unsigned.ipa)
+When you come back to Safari, the page shows the one step Apple will not automate: Settings → General → VPN & Device Management → Trust. Then open Swarm. It searches the Wi‑Fi for the server on its own.
 
-Confirm the install. Settings → General → VPN & Device Management → trust your Apple ID. First launch asks for the server address (for example `192.168.1.20:8000`). A free Apple ID expires the app in about 7 days; open SideStore or AltStore to refresh it.
-
-The same package is [Swarm-unsigned.ipa](https://github.com/coden607/swarm/releases/download/apk/Swarm-unsigned.ipa). [Add the Swarm source](sidestore://source?url=https%3A%2F%2Fraw.githubusercontent.com%2Fcoden607%2Fswarm%2Fmain%2Fios%2Faltstore.json) if you want later versions to show up inside SideStore.
+SideStore has to be installed once ([sidestore.io](https://sidestore.io)). AltStore works the same way if that is where this Apple ID is already signed in. A free Apple ID expires the app in about 7 days; opening SideStore or AltStore refreshes it with that saved login.
 
 ## 3. With a Mac (Xcode)
 ```sh
