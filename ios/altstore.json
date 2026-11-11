@@ -1,0 +1,26 @@
+{
+  "name": "Swarm",
+  "identifier": "com.coden607.swarm.source",
+  "sourceURL": "https://raw.githubusercontent.com/coden607/swarm/main/ios/altstore.json",
+  "apps": [
+    {
+      "name": "Swarm",
+      "bundleIdentifier": "com.coden607.swarm",
+      "developerName": "coden607",
+      "subtitle": "Cameras and swarm alerts",
+      "localizedDescription": "Live camera view and swarm alerts for a Swarm server on your network.",
+      "iconURL": "https://raw.githubusercontent.com/coden607/swarm/main/ui/apple-touch-icon.png",
+      "tintColor": "3ef2ff",
+      "versions": [
+        {
+          "version": "1.1",
+          "date": "2026-11-11T00:00:00-05:00",
+          "localizedDescription": "Current iPhone build from main.",
+          "downloadURL": "https://github.com/coden607/swarm/releases/download/apk/Swarm-unsigned.ipa",
+          "size": 58374,
+          "minOSVersion": "15.0"
+        }
+      ]
+    }
+  ]
+}

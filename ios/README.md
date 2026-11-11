@@ -7,11 +7,15 @@ iOS can't run the detection service. The iPhone is a viewer/controller: live cam
 2. Share -> **Add to Home Screen**. Open Swarm from the icon.
 3. Push alerts need the **https** link and iOS 16.4+: open from the Home Screen icon, tap **Enable alerts**.
 
-## 2. Native app without a Mac (sideload)
-1. Download [Swarm-unsigned.ipa](https://github.com/coden607/swarm/releases/download/apk/Swarm-unsigned.ipa) (rebuilt on each push to `main`), or GitHub -> Actions -> latest `ci` run -> artifact **Swarm-unsigned-ipa**.
-2. Install with [Sideloadly](https://sideloadly.io) or [AltStore](https://altstore.io) using a free Apple ID (re-sign every 7 days).
-3. Settings -> General -> VPN & Device Management -> trust your Apple ID.
-4. First launch asks for the server address (e.g. `192.168.1.20:8000`).
+## 2. Native app, one tap
+Install [SideStore](https://sidestore.io) or [AltStore](https://altstore.io) once (free Apple ID). Then tap:
+
+- [Install with SideStore](sidestore://install?url=https%3A%2F%2Fgithub.com%2Fcoden607%2Fswarm%2Freleases%2Fdownload%2Fapk%2FSwarm-unsigned.ipa)
+- [Install with AltStore](altstore://install?url=https%3A%2F%2Fgithub.com%2Fcoden607%2Fswarm%2Freleases%2Fdownload%2Fapk%2FSwarm-unsigned.ipa)
+
+Confirm the install. Settings → General → VPN & Device Management → trust your Apple ID. First launch asks for the server address (for example `192.168.1.20:8000`). A free Apple ID expires the app in about 7 days; open SideStore or AltStore to refresh it.
+
+The same package is [Swarm-unsigned.ipa](https://github.com/coden607/swarm/releases/download/apk/Swarm-unsigned.ipa). [Add the Swarm source](sidestore://source?url=https%3A%2F%2Fraw.githubusercontent.com%2Fcoden607%2Fswarm%2Fmain%2Fios%2Faltstore.json) if you want later versions to show up inside SideStore.
 
 ## 3. With a Mac (Xcode)
 ```sh
