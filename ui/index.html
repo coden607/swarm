@@ -218,14 +218,15 @@ async function pairFromHash() { // "#key=<password>" from the installer's QR/lin
   const m = /[#&]key=([^&]+)/.exec(location.hash || ""); if (!m) return;
   try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
   try {
-    const r = await fetch(`/login?username=admin&password=${m[1]}`, { method: "POST" });
+    let key = m[1]; try { key = decodeURIComponent(key); } catch (e) {}
+    const r = await fetch("/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: "admin", password: key }) });
     if (r.ok) { token = (await r.json()).access_token; try { localStorage.setItem("swarm_token", token); } catch (e) {} }
   } catch (e) {}
 }
 async function render() {
   clearInterval(tick);
   if (!token) await pairFromHash();
-  if (!token) { // browser on the server machine itself: sign in automatically
+  if (!token && !holdLocalLogin) { // browser on the server machine itself: sign in automatically
     try { const r = await fetch("/local-token"); if (r.ok) { token = (await r.json()).access_token; try { localStorage.setItem("swarm_token", token); } catch (e) {} } } catch (e) {}
   }
   $("login").hidden = !!token; $("app").hidden = !token;
@@ -267,6 +268,7 @@ function draw(s, ev, offlineTs) {
   if (!ev || !ev.length) evEl.innerHTML = "<small>None yet</small>";
 }
 
+let refreshing = false;
 async function refreshThumbs(cams) {
   for (const c of cams) {
     try {
@@ -279,13 +281,15 @@ async function refreshThumbs(cams) {
   }
 }
 async function refresh() {
+  if (refreshing) return;
+  refreshing = true;
   try {
     const [s, e] = await Promise.all([api("/status"), api("/events")]);
     $("offline").style.display = "none"; $("addcard").style.opacity = 1;
     if (s.alarm && !(window.__lastAlarm)) notify(`${s.total} people detected`);
     if (s.alarm) beep(); window.__lastAlarm = s.alarm;
     draw(s, e.events, 0);
-    refreshThumbs(s.cameras);
+    await refreshThumbs(s.cameras);
     const snap = { ts: Date.now(), status: s, events: e.events };
     lsSet("swarm_cache", snap);
     try { window.webkit.messageHandlers.swarmCache.postMessage(JSON.stringify(snap)); } catch (x) {}
@@ -299,12 +303,13 @@ async function refresh() {
       $("addcard").style.opacity = .4;
       draw(c.status, c.events, c.ts); err("");
     } else err(x);
-  }
+  } finally { refreshing = false; }
 }
 $("go").onclick = async () => {
   beep(); try { if (window.Notification && Notification.permission === "default") Notification.requestPermission(); } catch (e) {}
   try {
-    const r = await fetch(`/login?username=${encodeURIComponent($("u").value)}&password=${encodeURIComponent($("p").value)}`, { method: "POST" });
+    holdLocalLogin = false;
+    const r = await fetch("/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: $("u").value, password: $("p").value }) });
     const j = await r.json(); if (!r.ok) throw new Error(j.detail);
     err(""); setToken(j.access_token);
   } catch (e) { err(e); }
@@ -401,21 +406,34 @@ $("quicksetup").onclick = async () => {
     let added = 0;
     for (const d of devices) {
       for (const cred of commons) {
-        const [u, p] = cred.includes(":") ? cred.split(":",1) : [cred, ""];
+        const cut = cred.indexOf(":");
+        const u = cut < 0 ? cred : cred.slice(0, cut);
+        const p = cut < 0 ? "" : cred.slice(cut + 1);
+        const id = (d.brand || "cam") + "-" + d.ip.split(".").pop();
         try {
-          await api(`/cameras/${encodeURIComponent((d.brand||"cam")+"-"+d.ip.split(".").pop())}`, {
+          await api(`/cameras/${encodeURIComponent(id)}`, {
             method: "POST",
             body: JSON.stringify({ url: d.ip, brand: d.brand || "generic", username: u, password: p, threshold: +$("thr").value })
           });
-          added++; break;
-        } catch(e) {}
+          let up = false;
+          for (let n = 0; n < 12 && !up; n++) {
+            const s = await api("/status");
+            const cam = (s.cameras || []).find(x => x.id === id);
+            if (cam && (String(cam.status || "").startsWith("running") || cam.count !== null)) up = true;
+            else if (cam && /^(offline|error)/.test(cam.status || "")) break;
+            else await new Promise(r => setTimeout(r, 1000));
+          }
+          if (up) { added++; break; }
+          await api(`/cameras/${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {});
+        } catch (e) {}
       }
     }
     $("found").textContent = `Quick setup finished. Added ${added} camera(s). Check the list above.`;
     refresh();
   } catch(e) { $("found").textContent = ""; err(e); }
 };
-$("out").onclick = () => { stopPhone(); setToken(null); };
+let holdLocalLogin = false;
+$("out").onclick = () => { stopPhone(); holdLocalLogin = true; setToken(null); };
 
 // phone push alerts (iPhone: needs the https link + app added to Home Screen)
 function b64(k) { const p = "=".repeat((4 - k.length % 4) % 4), r = atob((k + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from([...r].map(c => c.charCodeAt(0))); }

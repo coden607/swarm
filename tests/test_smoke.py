@@ -127,8 +127,16 @@ def test_local_auto_login(client):
 
 
 def test_xmeye_template_gets_credentials():
-    from app.sources import candidates
+    from app.sources import _mask, candidates
     assert any("user=admin&password=pw" in u for u in candidates("10.0.0.9", "admin", "pw"))
+    shown = _mask("rtsp://10.0.0.9/user=admin&password=pw&channel=1")
+    assert shown == "rtsp://10.0.0.9/user=***&password=***&channel=1"
+    assert _mask("rtsp://admin:secret@10.0.0.9/live") == "rtsp://***@10.0.0.9/live"
+
+
+def test_login_accepts_json_body(client):
+    r = client.post("/login", json={"username": "admin", "password": "testpass"})
+    assert r.status_code == 200 and r.json().get("access_token")
 
 
 def test_live_snapshot(client, snapshot_server):

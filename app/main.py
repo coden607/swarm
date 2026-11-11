@@ -158,7 +158,15 @@ _fails: Dict[str, List[float]] = {}
 
 
 @app.post("/login")
-def login(request: Request, username: str, password: str):
+async def login(request: Request, username: str = "", password: str = ""):
+    if request.headers.get("content-type", "").split(";")[0].strip() == "application/json":
+        try:
+            data = await request.json()
+        except Exception:
+            data = {}
+        if isinstance(data, dict):
+            username = str(data.get("username") or username or "")
+            password = str(data.get("password") if data.get("password") is not None else password)
     if not ADMIN_PASS:
         raise HTTPException(status_code=503, detail="ADMIN_PASS not set in .env")
     ip = request.headers.get("cf-connecting-ip") or (request.client.host if request.client else "?")
