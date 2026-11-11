@@ -24,6 +24,7 @@ from .alert import trigger_alert  # noqa: E402
 from .detector import COOLDOWN, CONFIRM_HITS, CameraProcessor  # noqa: E402
 from .health import health_check  # noqa: E402
 from .sources import discover  # noqa: E402
+from .storage import write_json  # noqa: E402
 
 DATA = Path(os.getenv("SWARM_DATA_DIR", ROOT / "data"))
 DATA.mkdir(parents=True, exist_ok=True)
@@ -40,11 +41,7 @@ _state = {"last_total_alert": 0.0, "above_since": 0.0}
 
 
 def _write(path: Path, obj) -> None:
-    path.write_text(json.dumps(obj, indent=2))
-    try:
-        path.chmod(0o600)  # may hold camera passwords
-    except OSError:
-        pass
+    write_json(path, obj)
 
 
 def _save() -> None:
