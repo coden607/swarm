@@ -1,5 +1,6 @@
 import http.server
 import os
+import re
 import tempfile
 import threading
 import time
@@ -139,6 +140,28 @@ def test_iphone_install_page(client):
     assert r.status_code == 200
     assert "://install?url=" in r.text
     assert "Apple ID" in r.text
+    assert "Install Swarm" in r.text
+    assert "/install.mobileconfig" in r.text
+    assert "releases/latest/download/SideStore.ipa" in r.text
+    assert "altstore://install?url=" in r.text
+    assert "docs.sidestore.io/docs/installation/install" in r.text
+    assert "installSideStore" in r.text
+
+
+def test_iphone_one_click_profile(client):
+    r = client.get("/install.mobileconfig")
+    assert r.status_code == 200
+    assert client.head("/install.mobileconfig").status_code == 200
+    assert "application/x-apple-aspen-config" in r.headers["content-type"]
+    assert "inline; filename=\"swarm.mobileconfig\"" in r.headers.get("content-disposition", "")
+    body = r.text
+    assert "com.apple.webClip.managed" in body
+    assert "<string>Swarm</string>" in body
+    assert "http://testserver/" in body
+    r2 = client.get("/install.mobileconfig", headers={"x-forwarded-proto": "https", "x-forwarded-host": "dash.example"})
+    assert "https://dash.example/" in r2.text
+    uuids = re.findall(r"<key>PayloadUUID</key>\s*<string>([^<]+)</string>", r2.text)
+    assert len(set(uuids)) == 2
 
 
 def test_login_accepts_json_body(client):

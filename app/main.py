@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import json
 import os
@@ -6,9 +7,11 @@ import secrets
 import shutil
 import subprocess
 import time
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, List
+from xml.sax.saxutils import escape
 
 import jwt
 from dotenv import load_dotenv
@@ -319,10 +322,91 @@ def discover_cameras(_: str = Depends(require_auth)):
     return {"devices": discover()}
 
 
+def _install_origin(request: Request) -> str:
+    proto = (request.headers.get("x-forwarded-proto") or request.url.scheme).split(",")[0].strip()
+    host = (request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc).split(",")[0].strip()
+    return f"{proto}://{host}".rstrip("/")
+
+
+def _webclip_icon() -> str:
+    try:
+        return base64.b64encode((ROOT / "ui" / "apple-touch-icon.png").read_bytes()).decode("ascii")
+    except OSError:
+        return ""
+
+
 @app.get("/install")
 def install_page():
     """Phone installer. No login, so an iPhone can open it before the dashboard is set up."""
     return FileResponse(ROOT / "installer.html", media_type="text/html")
+
+
+@app.api_route("/install.mobileconfig", methods=["GET", "HEAD"])
+def install_mobileconfig(request: Request):
+    """One-tap iPhone Home Screen icon. Safari opens Settings; the user taps Install."""
+    origin = _install_origin(request)
+    clip_uid = str(uuid.uuid5(uuid.NAMESPACE_URL, origin + "/swarm-webclip"))
+    prof_uid = str(uuid.uuid5(uuid.NAMESPACE_URL, origin + "/swarm-profile"))
+    tag = clip_uid.split("-")[0]
+    icon = _webclip_icon()
+    icon_xml = f"<key>Icon</key><data>{icon}</data>" if icon else ""
+    body = f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>PayloadContent</key>
+  <array>
+    <dict>
+      <key>FullScreen</key>
+      <true/>
+      {icon_xml}
+      <key>IsRemovable</key>
+      <true/>
+      <key>Label</key>
+      <string>Swarm</string>
+      <key>PayloadDescription</key>
+      <string>Swarm Detection</string>
+      <key>PayloadDisplayName</key>
+      <string>Swarm</string>
+      <key>PayloadIdentifier</key>
+      <string>com.coden607.swarm.webclip.{tag}</string>
+      <key>PayloadType</key>
+      <string>com.apple.webClip.managed</string>
+      <key>PayloadUUID</key>
+      <string>{clip_uid}</string>
+      <key>PayloadVersion</key>
+      <integer>1</integer>
+      <key>Precomposed</key>
+      <true/>
+      <key>URL</key>
+      <string>{escape(origin)}/</string>
+    </dict>
+  </array>
+  <key>PayloadDisplayName</key>
+  <string>Swarm</string>
+  <key>PayloadIdentifier</key>
+  <string>com.coden607.swarm.{tag}</string>
+  <key>PayloadOrganization</key>
+  <string>Swarm Detection</string>
+  <key>PayloadRemovalDisallowed</key>
+  <false/>
+  <key>PayloadType</key>
+  <string>Configuration</string>
+  <key>PayloadUUID</key>
+  <string>{prof_uid}</string>
+  <key>PayloadVersion</key>
+  <integer>1</integer>
+</dict>
+</plist>
+"""
+    return Response(
+        content=body,
+        media_type="application/x-apple-aspen-config",
+        headers={
+            "Content-Disposition": 'inline; filename="swarm.mobileconfig"',
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 # Static UI last so it never shadows API routes
