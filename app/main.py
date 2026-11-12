@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 
-from . import events, push  # noqa: E402
+from . import events, push, sms  # noqa: E402
 from .alert import trigger_alert  # noqa: E402
 from .detector import COOLDOWN, CONFIRM_HITS, CameraProcessor  # noqa: E402
 from .health import health_check  # noqa: E402
@@ -109,6 +109,7 @@ def _start_tunnel() -> None:
 @asynccontextmanager
 async def lifespan(_app):
     _start_tunnel()
+    sms.start()
     try:
         settings.update(json.loads(SET_FILE.read_text()))
     except Exception:
@@ -119,6 +120,7 @@ async def lifespan(_app):
     except Exception:
         pass
     yield
+    sms.stop()
     for p in list(cameras.values()):
         p.stop_event.set()
     if _tunnel["proc"]:
@@ -296,6 +298,11 @@ def push_subscribe(sub: dict, _: str = Depends(require_auth)):
         raise HTTPException(status_code=400, detail="Bad subscription")
     push.add(sub)
     return {"ok": True, "devices": len(push.subscriptions())}
+
+
+@app.get("/alerts/delivery")
+def alert_delivery(_: str = Depends(require_auth)):
+    return sms.status()
 
 
 @app.get("/events")

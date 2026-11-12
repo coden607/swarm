@@ -22,3 +22,8 @@ cd ios && xcodegen && open Swarm.xcodeproj
 Select your iPhone, set your Team under Signing, Run.
 
 Unverified on a real device: the unsigned IPA is only built in CI, not tested on hardware.
+
+## Reliable alerts
+The native iOS app currently embeds WKWebView. For alerts when closed or locked, use the **HTTPS Safari Home Screen PWA** (iOS 16.4+) and tap **Enable alerts on this device**. Native APNs is not implemented. Multi-brand camera setup is handled by the existing server dashboard; iPhone is not a reliable always-on detector under iOS background execution limits.
+
+An optional server-side Twilio SMS channel is configured using `SWARM_SMS_TWILIO_SID`, `SWARM_SMS_TWILIO_TOKEN`, `SWARM_SMS_FROM`, `SWARM_SMS_TO`. No SMS will send without all four values. Outgoing messages use a persistent local SQLite retry queue, which resumes after internet outages. The site must have a working internet/cellular uplink to actually deliver SMS or push; without any connection only local alarms and history are available.
