@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import hashlib
 import json
@@ -16,7 +17,7 @@ from xml.sax.saxutils import escape
 import jwt
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -24,7 +25,7 @@ from pydantic import BaseModel, Field
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 
-from . import events, push  # noqa: E402
+from . import events, live, push, sms  # noqa: E402
 from .alert import trigger_alert  # noqa: E402
 from .detector import COOLDOWN, CONFIRM_HITS, CameraProcessor  # noqa: E402
 from .health import health_check  # noqa: E402
@@ -111,7 +112,10 @@ def _start_tunnel() -> None:
 
 @asynccontextmanager
 async def lifespan(_app):
+    live.bind(asyncio.get_running_loop())
     _start_tunnel()
+    sms.start()
+    push.start()
     try:
         settings.update(json.loads(SET_FILE.read_text()))
     except Exception:
@@ -122,6 +126,7 @@ async def lifespan(_app):
     except Exception:
         pass
     yield
+    sms.stop()
     for p in list(cameras.values()):
         p.stop_event.set()
     if _tunnel["proc"]:
@@ -299,6 +304,43 @@ def push_subscribe(sub: dict, _: str = Depends(require_auth)):
         raise HTTPException(status_code=400, detail="Bad subscription")
     push.add(sub)
     return {"ok": True, "devices": len(push.subscriptions())}
+
+
+def _sse(obj) -> str:
+    return "data: " + json.dumps(obj) + "\n\n"
+
+
+@app.get("/alerts/live")
+async def alerts_live(_: str = Depends(require_auth)):
+    """LAN alarm stream. Manual SSE so Python 3.9's older FastAPI pin still starts."""
+    q = live.subscribe()
+
+    async def gen():
+        try:
+            recent = live.recent()
+            if recent:
+                yield _sse(recent)
+            yield _sse({"ready": True})
+            while True:
+                item = await live.wait(q, 15)
+                yield ": keepalive\n\n" if item is None else _sse(item)
+        finally:
+            live.unsubscribe(q)
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.get("/alerts/delivery")
+def alert_delivery(_: str = Depends(require_auth)):
+    state = sms.status()
+    state["push_pending"] = push.pending()
+    state["server_sound"] = os.getenv("SWARM_SERVER_SOUND", "1") == "1"
+    state["local_hook"] = bool(os.getenv("SWARM_LOCAL_HOOK", "").strip())
+    return state
 
 
 @app.get("/events")

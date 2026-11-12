@@ -44,7 +44,15 @@ Cameras reconnect automatically and are remembered across restarts.
 ## Detection
 - **Offline (default):** built‑in OpenCV person detector. No internet, no key. Works for upright people at moderate distance; very dense crowds are under‑counted.
 - **Online:** add a Gemini key in `.env` for better accuracy; falls back to the offline detector automatically if the internet drops.
-- Per‑camera threshold plus a **combined swarm threshold** across all cameras. Alerts: red banner, browser beep + notification, server sound, optional email. History is kept.
+- Per‑camera threshold plus a **combined swarm threshold** across all cameras. Alerts: red banner, browser beep + notification, server sound, optional email, optional SMS. History is kept.
+- An open dashboard on the same network gets the alarm over a local stream immediately. That path does not use the internet.
+
+## When the power or the internet fails
+The count and the siren run on the Swarm computer. They keep working with no internet. Dashboards on the same LAN beep as soon as the alarm is raised.
+
+Web Push, email, and optional Twilio SMS are queued on disk and sent when an uplink returns. They cannot reach a phone that is away from home while the site has no uplink. Set `SWARM_LOCAL_HOOK` to a local program (a siren relay or an MQTT command on the LAN) for another on-site alarm.
+
+A power cut stops detection unless the Swarm computer, the cameras, and the switch are on a battery. Off-site alerts during an internet outage also need a cellular router on that battery. No app can notify a distant phone when the site has neither power nor any way out.
 
 ## Online and offline
 - **On your network (no internet needed):** open `http://<server-ip>:8000` from any device.
@@ -58,7 +66,7 @@ Cameras reconnect automatically and are remembered across restarts.
 - **iPhone/iPad:** [one-tap installer](https://cdn.jsdelivr.net/gh/coden607/swarm@main/installer.html) or `http://<server>:8000/install`. SideStore uses the Apple ID already on the phone; if SideStore is missing the installer installs it. Safari → Share → Add to Home Screen still works with no extra app.
 
 ## Options (env vars)
-`SWARM_HOME` · `SWARM_PORT` · `GEMINI_API_KEY` · `SWARM_REMOTE=1` · `SWARM_HTTPS=1` · `SWARM_NO_START=1` · `SWARM_NO_SERVICE=1` · `SWARM_NO_ICON=1`
+`SWARM_HOME` · `SWARM_PORT` · `GEMINI_API_KEY` · `SWARM_REMOTE=1` · `SWARM_HTTPS=1` · `SWARM_NO_START=1` · `SWARM_NO_SERVICE=1` · `SWARM_NO_ICON=1` · `SWARM_LOCAL_HOOK` · `SWARM_SMS_TWILIO_SID` · `SWARM_SMS_TWILIO_TOKEN` · `SWARM_SMS_FROM` · `SWARM_SMS_TO`
 Detector: `SWARM_DETECTOR=auto|local|gemini`, `GEMINI_MODEL`. Uninstall (Linux/macOS/Termux): `sh install.sh --uninstall`.
 Other `.env` keys: `ADMIN_USER`, `ADMIN_PASS`, `JWT_SECRET`, `EMAIL_SMTP_*`, `EMAIL_FROM`, `ONVIF_USER`/`ONVIF_PASS`.
 

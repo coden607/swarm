@@ -267,3 +267,23 @@ def test_brand_guess_from_banner():
         assert guess_brand(_http_banner("127.0.0.1", srv.server_address[1])) == "hikvision"
     finally:
         srv.shutdown()
+
+
+def test_live_alert_replays_to_dashboard(client):
+    from app.alert import trigger_alert
+    bare = client.headers.pop("Authorization")
+    assert client.get("/alerts/live").status_code == 401
+    client.headers["Authorization"] = bare
+    trigger_alert(9, [], "gate")
+    with client.stream("GET", "/alerts/live") as response:
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/event-stream")
+        buf = ""
+        for chunk in response.iter_text():
+            buf += chunk
+            if "gate" in buf:
+                break
+    assert "gate" in buf
+    delivery = client.get("/alerts/delivery").json()
+    assert delivery["sms_configured"] is False
+    assert "push_pending" in delivery and "server_sound" in delivery

@@ -1,7 +1,7 @@
 // Offline app shell. API calls always go to the network (the page caches the last data itself).
-const C = "swarm-shell-v8";
+const C = "swarm-shell-v9";
 const SHELL = ["/", "/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
-const API = ["/cameras", "/status", "/discover", "/settings", "/health", "/login", "/events", "/remote", "/push"];
+const API = ["/cameras", "/status", "/discover", "/settings", "/health", "/login", "/events", "/remote", "/push", "/alerts"];
 self.addEventListener("install", e => { self.skipWaiting(); e.waitUntil(caches.open(C).then(c => c.addAll(SHELL))); });
 self.addEventListener("activate", e => e.waitUntil(
   caches.keys().then(ks => Promise.all(ks.filter(k => k !== C).map(k => caches.delete(k)))).then(() => self.clients.claim())));

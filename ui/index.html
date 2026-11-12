@@ -178,6 +178,7 @@
     <div class="card">
       <div id="remote"><small>Remote access: checking…</small></div>
       <button id="pushbtn" class="sec">Enable alerts on this device</button>
+      <small>On this network the alarm arrives on the open dashboard immediately, with or without internet. A phone away from home needs Web Push (Safari → Add to Home Screen, then this button, iOS 16.4+, HTTPS) or SMS. Those wait and retry if the uplink is down. They cannot leave the building during a total outage.</small>
       <small id="pushmsg"></small>
       <button id="install" class="sec" hidden>Install app on this device</button>
       <small id="ioshint" hidden>iPhone/iPad: one tap at <a href="/install">Install Swarm</a>, or Share → Add to Home Screen.</small>
@@ -189,7 +190,7 @@
 <script>
 const $ = id => document.getElementById(id);
 const thumbs = {};
-let token = null, audio = null, phoneTimer = null, tick = null, n = 0, installEvt = null;
+let token = null, audio = null, phoneTimer = null, tick = null, n = 0, installEvt = null, liveAbort = null;
 try { token = localStorage.getItem("swarm_token"); } catch (e) {}
 const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
@@ -205,6 +206,40 @@ async function api(path, opts = {}) {
   return j;
 }
 function setToken(t) { token = t; try { t ? localStorage.setItem("swarm_token", t) : localStorage.removeItem("swarm_token"); } catch (e) {} render(); }
+function startLive() {
+  if (liveAbort) { liveAbort.abort(); liveAbort = null; }
+  if (!token) return;
+  liveAbort = new AbortController();
+  const signal = liveAbort.signal;
+  (async () => {
+    while (token && !signal.aborted) {
+      try {
+        const r = await fetch("/alerts/live", { headers: { Authorization: "Bearer " + token }, signal });
+        if (r.status === 401) { setToken(null); return; }
+        if (!r.ok || !r.body) throw new Error("live");
+        const reader = r.body.getReader();
+        const dec = new TextDecoder();
+        let buf = "";
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          let cut;
+          while ((cut = buf.indexOf("\n\n")) >= 0) {
+            const block = buf.slice(0, cut);
+            buf = buf.slice(cut + 2);
+            const dataLine = block.split("\n").filter(l => l.startsWith("data:")).map(l => l.slice(5).trim()).join("");
+            if (!dataLine) continue;
+            let data;
+            try { data = JSON.parse(dataLine); } catch (e) { continue; }
+            if (data && data.alarm) { beep(); notify(data.msg || "Swarm alert"); window.__lastAlarm = true; }
+          }
+        }
+      } catch (e) { if (signal.aborted) return; }
+      await new Promise(res => setTimeout(res, 1000));
+    }
+  })();
+}
 function err(e) { $("err").textContent = e ? (e.message || e) : ""; }
 function beep() {
   try { audio = audio || new (window.AudioContext || window.webkitAudioContext)();
@@ -230,7 +265,8 @@ async function render() {
     try { const r = await fetch("/local-token"); if (r.ok) { token = (await r.json()).access_token; try { localStorage.setItem("swarm_token", token); } catch (e) {} } } catch (e) {}
   }
   $("login").hidden = !!token; $("app").hidden = !token;
-  if (!token) return;
+  if (!token) { if (liveAbort) { liveAbort.abort(); liveAbort = null; } return; }
+  startLive();
   await refresh(); tick = setInterval(refresh, 2000);
 }
 
