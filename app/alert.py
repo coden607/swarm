@@ -1,4 +1,5 @@
 import os
+import shlex
 import smtplib
 import subprocess
 import sys
@@ -7,7 +8,7 @@ from email.message import EmailMessage
 from pathlib import Path
 from typing import List
 
-from . import events, push
+from . import events, live, push, sms
 
 _ROOT = Path(__file__).resolve().parent.parent
 _DATA = Path(os.getenv("SWARM_DATA_DIR", _ROOT / "data"))
@@ -65,13 +66,40 @@ def send_email(to_addresses: List[str], subject: str, body: str) -> None:
         print(f"[alert] Failed to send email: {e}")
 
 
+def _local_hook(msg: str) -> None:
+    """Run a local program (siren, LAN relay). No shell. Failure stays off the camera loop."""
+    raw = os.getenv("SWARM_LOCAL_HOOK", "").strip()
+    if not raw:
+        return
+    cmd = shlex.split(raw)
+    if not cmd:
+        return
+    try:
+        subprocess.Popen(cmd + [msg], cwd=str(_ROOT))
+    except OSError as e:
+        print(f"[alert] local hook unavailable: {e}")
+
+
 def trigger_alert(count: int, email_addresses: List[str], label: str = "") -> None:
     msg = f"Swarm alert{' on ' + label if label else ''}: {count} people detected."
     print(f"[alert] {msg}")
-    events.add(label, count)
-    push.send_async("Swarm alert", msg)
+    # Local listeners first. Disk and the internet must not delay the siren or the open dashboards.
+    try:
+        live.publish({"alarm": True, "count": count, "label": label, "msg": msg})
+    except Exception as e:
+        print(f"[alert] local fanout failed: {e}")
+    _local_hook(msg)
     if os.getenv("SWARM_SERVER_SOUND", "1") == "1":
         subprocess.Popen([sys.executable, "-c", "import app.alert as a; a.play_alarm()"], cwd=str(_ROOT))
+    try:
+        events.add(label, count)
+    except Exception as e:
+        print(f"[alert] history write failed: {e}")
+    push.send_async("Swarm alert", msg)
+    try:
+        sms.enqueue(msg)
+    except (OSError, RuntimeError):
+        print("[alert] SMS queue unavailable; local event retained")
     if email_addresses:
         subprocess.Popen([sys.executable, "-c",
                           f"import app.alert as a; a.send_email({list(email_addresses)!r}, 'Swarm Alert', {msg!r})"], cwd=str(_ROOT))

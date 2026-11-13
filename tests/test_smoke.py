@@ -1,5 +1,6 @@
 import http.server
 import os
+import re
 import tempfile
 import threading
 import time
@@ -139,6 +140,33 @@ def test_iphone_install_page(client):
     assert r.status_code == 200
     assert "://install?url=" in r.text
     assert "Apple ID" in r.text
+    assert "Install Swarm" in r.text
+    assert "/install.mobileconfig" in r.text
+    assert "releases/latest/download/SideStore.ipa" in r.text
+    assert "altstore://install?url=" in r.text
+    assert "docs.sidestore.io/docs/installation/install" in r.text
+    assert "installSideStore" in r.text
+    assert "I trusted Swarm" in r.text
+    assert "iloader.app" in r.text
+    assert "Allow from this source" in r.text
+    assert "More info" in r.text
+    assert "right‑click" in r.text or "right-click" in r.text
+
+
+def test_iphone_one_click_profile(client):
+    r = client.get("/install.mobileconfig")
+    assert r.status_code == 200
+    assert client.head("/install.mobileconfig").status_code == 200
+    assert "application/x-apple-aspen-config" in r.headers["content-type"]
+    assert "inline; filename=\"swarm.mobileconfig\"" in r.headers.get("content-disposition", "")
+    body = r.text
+    assert "com.apple.webClip.managed" in body
+    assert "<string>Swarm</string>" in body
+    assert "http://testserver/" in body
+    r2 = client.get("/install.mobileconfig", headers={"x-forwarded-proto": "https", "x-forwarded-host": "dash.example"})
+    assert "https://dash.example/" in r2.text
+    uuids = re.findall(r"<key>PayloadUUID</key>\s*<string>([^<]+)</string>", r2.text)
+    assert len(set(uuids)) == 2
 
 
 def test_login_accepts_json_body(client):
@@ -239,3 +267,18 @@ def test_brand_guess_from_banner():
         assert guess_brand(_http_banner("127.0.0.1", srv.server_address[1])) == "hikvision"
     finally:
         srv.shutdown()
+
+
+def test_live_alert_replays_to_dashboard(client):
+    from app.alert import trigger_alert
+    bare = client.headers.pop("Authorization")
+    assert client.get("/alerts/live").status_code == 401
+    client.headers["Authorization"] = bare
+    trigger_alert(9, [], "gate")
+    response = client.get("/alerts/live?once=1")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert "gate" in response.text
+    delivery = client.get("/alerts/delivery").json()
+    assert delivery["sms_configured"] is False
+    assert "push_pending" in delivery and "server_sound" in delivery

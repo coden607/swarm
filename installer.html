@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/coden607/swarm/main/ui/apple-touch-icon.png" />
   <title>Swarm Detection – One‑Click Installer</title>
   <style>
     body{font-family:system-ui,Arial,sans-serif;margin:0;padding:1rem;background:#f5f5f5}
@@ -10,99 +11,241 @@
     h1{text-align:center;font-size:1.4rem}
     pre{background:#111;color:#e6e6e6;padding:.75rem;border-radius:6px;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
     button,a.go{display:block;width:100%;box-sizing:border-box;padding:.8rem;margin:.4rem 0;background:#2b8a3e;color:#fff;border:0;border-radius:4px;font-size:1rem;cursor:pointer;text-align:center;text-decoration:none}
+    button.sec,a.sec{background:#555}
     .hint{color:#555;font-size:.9rem}
+    .step{border:1px solid #ddd;border-radius:8px;padding:1rem;margin:.6rem 0}
+    .step ol{margin:.4rem 0 .2rem 1.2rem;padding:0}
+    .step li{margin:.35rem 0}
+    .n{display:inline-block;min-width:1.5rem;height:1.5rem;line-height:1.5rem;background:#2b8a3e;color:#fff;border-radius:50%;text-align:center;font-size:.85rem;margin-right:.35rem}
   </style>
 </head>
 <body>
 <div class="c">
   <h1>Swarm Detection – One‑Click Install</h1>
+  <noscript><p class="hint"><a href="/install.mobileconfig">Install Swarm on iPhone</a> (enable JavaScript for other systems).</p></noscript>
   <p class="hint" id="detected"></p>
-  <pre id="cmd"></pre>
-  <div id="actions" hidden></div>
-  <a id="termux" href="https://f-droid.org/packages/com.termux/" style="display:none;margin:.5rem 0;text-align:center" class="hint"><b>Step 1 – Get Termux (F‑Droid)</b></a>
-  <button id="copy">Copy command</button>
-  <p class="hint">Or download and double‑click:
-    <a href="https://github.com/coden607/swarm/raw/main/Install-Windows.bat">Windows</a> ·
-    <a href="https://github.com/coden607/swarm/raw/main/Install-Mac.command">macOS</a> ·
-    <a href="https://github.com/coden607/swarm/raw/main/Install-Linux.sh">Linux</a></p>
+  <div id="actions"></div>
+  <pre id="cmd" hidden></pre>
+  <button id="copy" hidden>Copy command</button>
   <p class="hint" id="steps"></p>
   <hr />
   <p class="hint">Other systems: <a href="#" data-os="unix">Linux / macOS</a> · <a href="#" data-os="android">Android</a> · <a href="#" data-os="win">Windows</a> · <a href="#" data-os="ios">iPhone / iPad</a></p>
 </div>
 <script>
   const RAW = 'https://raw.githubusercontent.com/coden607/swarm/main';
-  const OS = {
-    unix: { name: 'Linux / macOS / Android (Termux)', cmd: `curl -fsSL ${RAW}/install.sh | sh`,
-      steps: 'Open a terminal (on Android: install Termux from F‑Droid first), paste, press Enter. Adds a desktop/app icon and prints the URL, login and QR code. Prefix with SWARM_REMOTE=1 for a public link.' },
-    android: { name: 'Android', cmd: `pkg upgrade -y -o Dpkg::Options::=--force-confold && pkg install -y curl && curl -fsSL ${RAW}/install.sh | sh`,
-      steps: '1) Install Termux from F‑Droid (button above; not the Play Store version). 2) Open Termux, paste the command, press Enter. 3) Open the printed address in Chrome → menu → Install app. If another computer/Pi already runs Swarm, skip Termux: just open its https link in Chrome → Install app → Enable alerts.' },
-    win: { name: 'Windows', cmd: `irm ${RAW}/install.ps1 | iex`,
-      steps: 'Open PowerShell (Administrator recommended so the firewall port opens), paste, press Enter. Adds a Desktop and Start Menu icon.' },
-    ios: { name: 'iPhone / iPad', cmd: '',
-      steps: '' }
-  };
-  const ua = navigator.userAgent || '';
-  let key = /iPad|iPhone|iPod/.test(ua) ? 'ios' : /Android/.test(ua) ? 'android' : /Win/.test(ua) ? 'win' : 'unix';
-  function show(k) {
-    const o = OS[k];
-    document.getElementById('detected').textContent = 'Detected / selected: ' + o.name;
-    document.getElementById('cmd').textContent = o.cmd;
-    document.getElementById('steps').textContent = o.steps;
-    const ios = k === 'ios';
-    document.getElementById('cmd').hidden = ios;
-    document.getElementById('copy').hidden = ios;
-    document.getElementById('actions').hidden = !ios;
-    document.getElementById('termux').style.display = k === 'android' ? 'block' : 'none';
-    if (ios) renderIos();
-  }
   const IPA = encodeURIComponent('https://github.com/coden607/swarm/releases/download/apk/Swarm-unsigned.ipa');
-  let iosStep = 0, leftApp = false, missed = false;
+  const APK = 'https://github.com/coden607/swarm/releases/download/apk/Swarm.apk';
+  const SIDESTORE_IPA_FILE = 'https://github.com/SideStore/SideStore/releases/latest/download/SideStore.ipa';
+  const SIDESTORE_IPA = encodeURIComponent(SIDESTORE_IPA_FILE);
+  const SIDESTORE_SETUP = 'https://docs.sidestore.io/docs/installation/install';
+  const ILOADER = 'https://iloader.app';
+  const FILES = {
+    win: 'https://github.com/coden607/swarm/raw/main/Install-Windows.bat',
+    mac: 'https://github.com/coden607/swarm/raw/main/Install-Mac.command',
+    linux: 'https://github.com/coden607/swarm/raw/main/Install-Linux.sh'
+  };
+  const hosted = /^https?:$/.test(location.protocol) && !/jsdelivr\.net|github\.io|githubusercontent\.com/.test(location.host);
+  const ua = navigator.userAgent || '';
+  let key = /iPad|iPhone|iPod/.test(ua) ? 'ios' : /Android/.test(ua) ? 'android' : /Win/.test(ua) ? 'win' : /Mac/.test(ua) ? 'mac' : 'linux';
+  let iosStep = 0, leftApp = false, native = false;
+
+  function rememberRetry() { try { sessionStorage.setItem('swarm-retry-native', '1'); } catch (e) {} }
+  function bind(id, fn) { const el = document.getElementById(id); if (el) el.onclick = fn; }
+  function dl(url) { location.href = url; }
+
   function openSigner(scheme) {
+    native = true;
     leftApp = false;
-    missed = false;
     iosStep = 1;
-    renderIos();
+    render();
     location.href = scheme + '://install?url=' + IPA;
-    setTimeout(() => { if (!leftApp && iosStep === 1) { missed = true; renderIos(); } }, 1400);
+    setTimeout(() => { if (!leftApp && iosStep === 1) installSideStore(); }, 1400);
   }
-  function renderIos() {
-    const actions = document.getElementById('actions');
-    const signIn = 'Uses the Apple ID already saved in SideStore or AltStore. If that app asks you to sign in, use the same Apple ID this iPhone uses. Swarm never sees the password.';
-    if (iosStep === 0) {
-      actions.innerHTML = `<button type="button" id="go-side">Continue with this iPhone's Apple ID</button>
-        <p class="hint">${signIn} SideStore opens and installs Swarm. Confirm the install there.</p>
-        <p class="hint">No SideStore yet? <a href="https://sidestore.io">Install SideStore</a> once, sign in with this phone's Apple ID, then come back and tap the button.</p>`;
-      document.getElementById('go-side').onclick = () => openSigner('sidestore');
-    } else if (iosStep === 1) {
-      actions.innerHTML = missed
-        ? `<p class="hint">SideStore did not open. Install it, sign in with this iPhone's Apple ID, then try again. Or use AltStore if that is what you already sign in to.</p>
-           <button type="button" id="go-side">Try SideStore again</button>
-           <button type="button" id="go-alt">Continue in AltStore</button>
-           <a class="go" href="https://sidestore.io">Get SideStore</a>`
-        : `<p class="hint">SideStore should be open. Confirm the install. If it asks for an Apple ID, use the one already on this iPhone. Come back here when the app is on the Home Screen.</p>`;
-      const side = document.getElementById('go-side');
-      const alt = document.getElementById('go-alt');
-      if (side) side.onclick = () => openSigner('sidestore');
-      if (alt) alt.onclick = () => openSigner('altstore');
-    } else if (iosStep === 2) {
-      actions.innerHTML = `<p class="hint">Apple requires one tap that no app can do for you. Open Settings → General → VPN &amp; Device Management, tap the Apple ID that signed Swarm, then Trust.</p>
-        <button type="button" id="trusted">I trusted Swarm</button>`;
-      document.getElementById('trusted').onclick = () => { iosStep = 3; renderIos(); };
-    } else {
-      actions.innerHTML = `<p class="hint">Open Swarm on the Home Screen. It looks for your server on the Wi‑Fi by itself. A free Apple ID expires the app in about 7 days; open SideStore or AltStore and it refreshes with the same saved login.</p>`;
+  function installSideStore() {
+    native = true;
+    leftApp = false;
+    iosStep = 11;
+    rememberRetry();
+    render();
+    location.href = 'altstore://install?url=' + SIDESTORE_IPA;
+  }
+  function oneClick() {
+    if (hosted && !native) {
+      iosStep = 10;
+      render();
+      location.href = '/install.mobileconfig';
+      return;
     }
+    openSigner('sidestore');
   }
+
+  function renderIos() {
+    const signIn = 'Uses the Apple ID already saved in SideStore or AltStore. Swarm never sees the password.';
+    if (iosStep === 0) {
+      return hosted
+        ? `<button type="button" id="go-one">Install Swarm</button>
+           <p class="hint">This page does every automated step. Apple still needs you in Settings for one tap — this screen will walk you through it.</p>
+           <button type="button" id="go-side" class="sec">Native app instead (SideStore)</button>
+           <p class="hint">${signIn}</p>`
+        : `<button type="button" id="go-one">Install Swarm</button>
+           <p class="hint">${signIn} If SideStore is missing, this screen installs it and pauses on each step only you can do.</p>`;
+    }
+    if (iosStep === 10) {
+      return `<div class="step"><span class="n">1</span><b>Settings should be open</b>
+        <ol>
+          <li>Tap <b>Install</b> in the top right.</li>
+          <li>Enter this iPhone's passcode if it asks.</li>
+          <li>Tap <b>Install</b> again, then <b>Done</b>.</li>
+        </ol>
+        <button type="button" id="go-done">Swarm is on the Home Screen</button>
+        <button type="button" id="go-one" class="sec">Open Settings again</button>
+        <button type="button" id="go-side" class="sec">Native app instead (SideStore)</button></div>`;
+    }
+    if (iosStep === 11) {
+      return `<div class="step"><span class="n">1</span><b>SideStore is not on this iPhone</b>
+        <p class="hint">Tried AltStore. If AltStore opened, confirm SideStore there, then come back.</p>
+        <p>If nothing opened, do these on a computer (Safari cannot put SideStore on a stock iPhone by itself):</p>
+        <ol>
+          <li>On a computer, open <a href="${ILOADER}">iloader.app</a> and install iloader.</li>
+          <li>Plug this iPhone in with USB and Trust the computer.</li>
+          <li>In iloader: sign in with this iPhone's Apple ID → select this device → <b>Install SideStore (Stable)</b>.</li>
+          <li>On this iPhone: Settings → General → VPN &amp; Device Management → tap the Apple ID → <b>Trust</b>.</li>
+          <li>If asked: Settings → Privacy &amp; Security → <b>Developer Mode</b> on, then restart.</li>
+          <li>Open <b>LocalDevVPN</b> → Connect, then open SideStore and sign in with the same Apple ID.</li>
+        </ol>
+        <button type="button" id="go-side">SideStore is installed — install Swarm</button>
+        <a class="go sec" href="${SIDESTORE_IPA_FILE}">Download SideStore.ipa</a>
+        <a class="go sec" href="${SIDESTORE_SETUP}">Official SideStore steps</a>
+        ${hosted ? '<button type="button" id="go-one" class="sec">Home Screen icon instead</button>' : ''}</div>`;
+    }
+    if (iosStep === 1) {
+      return `<div class="step"><span class="n">2</span><b>Confirm in SideStore</b>
+        <ol>
+          <li>If SideStore asks, sign in with this iPhone's Apple ID.</li>
+          <li>Confirm the Swarm install.</li>
+          <li>Come back here when Swarm is on the Home Screen.</li>
+        </ol>
+        <p class="hint">This page continues when you return. If SideStore never opened, it will switch to the setup steps.</p></div>`;
+    }
+    if (iosStep === 2) {
+      return `<div class="step"><span class="n">3</span><b>Trust Swarm in Settings</b>
+        <ol>
+          <li>Open <b>Settings</b>.</li>
+          <li>Tap <b>General</b>.</li>
+          <li>Tap <b>VPN &amp; Device Management</b>.</li>
+          <li>Tap the Apple ID that signed Swarm.</li>
+          <li>Tap <b>Trust</b>, then Trust again.</li>
+        </ol>
+        <button type="button" id="trusted">I trusted Swarm</button></div>`;
+    }
+    return `<div class="step"><span class="n">4</span><b>Open Swarm</b>
+      <p>Open Swarm on the Home Screen. It looks for your server on Wi‑Fi by itself. A free Apple ID expires the app in about 7 days; open SideStore and it refreshes with the same saved login.</p></div>`;
+  }
+
+  function renderDesktop(kind) {
+    const names = { win: 'Windows', mac: 'macOS', linux: 'Linux / other' };
+    const files = { win: 'Install-Windows.bat', mac: 'Install-Mac.command', linux: 'Install-Linux.sh' };
+    const leftover = {
+      win: `<ol>
+          <li>Open the downloaded <b>Install-Windows.bat</b>.</li>
+          <li>If SmartScreen says "Windows protected your PC": tap <b>More info</b> → <b>Run anyway</b>.</li>
+          <li>If a firewall prompt appears, allow access so phones on Wi‑Fi can reach it.</li>
+          <li>Wait until the dashboard opens, already signed in.</li>
+        </ol>`,
+      mac: `<ol>
+          <li>Find <b>Install-Mac.command</b> in Downloads.</li>
+          <li>First time: <b>right‑click</b> (or Control‑click) → <b>Open</b> → <b>Open</b>. Gatekeeper blocks a normal double‑click.</li>
+          <li>Allow Terminal if macOS asks.</li>
+          <li>Wait until the dashboard opens, already signed in.</li>
+        </ol>`,
+      linux: `<ol>
+          <li>Open a terminal in Downloads.</li>
+          <li>If it will not run: <code>chmod +x Install-Linux.sh</code> then <code>./Install-Linux.sh</code>.</li>
+          <li>Enter your password only if the script asks for sudo (packages).</li>
+          <li>Wait until the dashboard opens, already signed in.</li>
+        </ol>`
+    };
+    const cmd = kind === 'win' ? `irm ${RAW}/install.ps1 | iex` : `curl -fsSL ${RAW}/install.sh | sh`;
+    document.getElementById('cmd').textContent = cmd;
+    document.getElementById('cmd').hidden = false;
+    document.getElementById('copy').hidden = false;
+    return `<button type="button" id="go-dl">Download ${files[kind]}</button>
+      <div class="step"><span class="n">1</span><b>This file installs and starts Swarm</b>
+        ${leftover[kind]}
+        <button type="button" id="go-dl2" class="sec">Download again</button>
+      </div>
+      <p class="hint">Detected: ${names[kind]}. The command below is optional if you prefer a terminal.</p>`;
+  }
+
+  function renderAndroid() {
+    document.getElementById('cmd').textContent = `pkg upgrade -y -o Dpkg::Options::=--force-confold && pkg install -y curl && curl -fsSL ${RAW}/install.sh | sh`;
+    document.getElementById('cmd').hidden = false;
+    document.getElementById('copy').hidden = false;
+    return `<button type="button" id="go-apk">Download Swarm.apk</button>
+      <div class="step"><span class="n">1</span><b>Install the app (viewer)</b>
+        <ol>
+          <li>Open the downloaded <b>Swarm.apk</b>.</li>
+          <li>If Android blocks it: <b>Settings</b> → tap <b>Allow from this source</b> → Install.</li>
+          <li>Open Swarm. It finds your server on Wi‑Fi.</li>
+        </ol>
+        <button type="button" id="go-apk2" class="sec">Download APK again</button>
+      </div>
+      <div class="step"><span class="n">2</span><b>Only if this phone is the server</b>
+        <ol>
+          <li>Install <a href="https://f-droid.org/packages/com.termux/">Termux from F‑Droid</a> (not Play Store).</li>
+          <li>Open Termux, tap <b>Copy command</b> below, paste, press Enter.</li>
+          <li>Open the address it prints in Chrome → menu → Install app.</li>
+        </ol>
+      </div>`;
+  }
+
+  function render() {
+    const detected = { ios: 'iPhone / iPad', android: 'Android', win: 'Windows', mac: 'macOS', linux: 'Linux / other' };
+    document.getElementById('detected').textContent = 'Detected / selected: ' + detected[key];
+    document.getElementById('cmd').hidden = true;
+    document.getElementById('copy').hidden = true;
+    document.getElementById('steps').textContent = '';
+    const actions = document.getElementById('actions');
+    if (key === 'ios') actions.innerHTML = renderIos();
+    else if (key === 'android') actions.innerHTML = renderAndroid();
+    else actions.innerHTML = renderDesktop(key);
+    bind('go-one', oneClick);
+    bind('go-side', () => { if (iosStep === 11 || iosStep === 10) { native = true; openSigner('sidestore'); } else openSigner('sidestore'); });
+    bind('go-done', () => { iosStep = 3; render(); });
+    bind('trusted', () => { iosStep = 3; render(); });
+    bind('go-dl', () => dl(FILES[key] || FILES.linux));
+    bind('go-dl2', () => dl(FILES[key] || FILES.linux));
+    bind('go-apk', () => dl(APK));
+    bind('go-apk2', () => dl(APK));
+  }
+
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') leftApp = true;
-    if (document.visibilityState === 'visible' && leftApp && iosStep === 1) { iosStep = 2; renderIos(); }
+    if (document.visibilityState === 'visible' && leftApp) {
+      if (iosStep === 1) { iosStep = 2; render(); }
+      if (iosStep === 11) { leftApp = false; openSigner('sidestore'); }
+    }
   });
-  document.querySelectorAll('[data-os]').forEach(a => a.onclick = e => { e.preventDefault(); show(a.dataset.os); });
+  document.querySelectorAll('[data-os]').forEach(a => a.onclick = e => {
+    e.preventDefault();
+    const k = a.dataset.os;
+    key = k === 'unix' ? (/Mac/.test(ua) ? 'mac' : 'linux') : k;
+    iosStep = 0; native = false;
+    render();
+  });
   document.getElementById('copy').onclick = () => {
     navigator.clipboard.writeText(document.getElementById('cmd').textContent).then(
       () => document.getElementById('copy').textContent = 'Copied ✔',
       () => document.getElementById('copy').textContent = 'Select the text above and copy manually');
   };
-  show(key);
+  render();
+  try {
+    if (key === 'ios' && sessionStorage.getItem('swarm-retry-native') === '1') {
+      sessionStorage.removeItem('swarm-retry-native');
+      native = true;
+      openSigner('sidestore');
+    }
+  } catch (e) {}
 </script>
 </body>
 </html>

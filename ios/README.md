@@ -7,12 +7,12 @@ iOS can't run the detection service. The iPhone is a viewer/controller: live cam
 2. Share -> **Add to Home Screen**. Open Swarm from the icon.
 3. Push alerts need the **https** link and iOS 16.4+: open from the Home Screen icon, tap **Enable alerts**.
 
-## 2. Native app
-Open [the installer](https://cdn.jsdelivr.net/gh/coden607/swarm@main/installer.html) in Safari. Tap **Continue with this iPhone's Apple ID**. SideStore opens and signs Swarm with the Apple ID already saved in SideStore. If SideStore asks you to sign in, use the same Apple ID this phone uses. Swarm does not ask for the password.
+## 2. One tap, then interactive leftovers
+Open [the installer](https://cdn.jsdelivr.net/gh/coden607/swarm@main/installer.html) in Safari and tap **Install Swarm**.
 
-When you come back to Safari, the page shows the one step Apple will not automate: Settings → General → VPN & Device Management → Trust. Then open Swarm. It searches the Wi‑Fi for the server on its own.
+The page runs every step it can. When Apple or SideStore needs you, it shows one numbered card at a time (Settings → Install, SideStore confirm, Settings → Trust, or first-time SideStore with iloader on a computer). Tap **I've done this** / **I trusted Swarm** to continue. Swarm does not ask for the Apple ID password. It searches the Wi‑Fi for the server on its own.
 
-SideStore has to be installed once ([sidestore.io](https://sidestore.io)). AltStore works the same way if that is where this Apple ID is already signed in. A free Apple ID expires the app in about 7 days; opening SideStore or AltStore refreshes it with that saved login.
+A free Apple ID expires the app in about 7 days; opening SideStore refreshes it with the same saved login.
 
 ## 3. With a Mac (Xcode)
 ```sh
@@ -22,3 +22,8 @@ cd ios && xcodegen && open Swarm.xcodeproj
 Select your iPhone, set your Team under Signing, Run.
 
 Unverified on a real device: the unsigned IPA is only built in CI, not tested on hardware.
+
+## Reliable alerts
+The native iOS app embeds a web view. For alerts when the phone is locked, use the HTTPS Safari Home Screen app (iOS 16.4+) and tap **Enable alerts on this device**. Native APNs is not implemented. The iPhone is not a reliable always-on detector.
+
+On the same Wi-Fi, an open Swarm dashboard gets the alarm from the server directly. That does not need the internet. Web Push and optional Twilio SMS (`SWARM_SMS_TWILIO_SID`, `SWARM_SMS_TWILIO_TOKEN`, `SWARM_SMS_FROM`, `SWARM_SMS_TO`) are queued and retried after an outage. They cannot reach the phone while the site has no uplink. `SWARM_LOCAL_HOOK` can run a siren or LAN relay on the server with no internet. A power cut still stops detection unless that server, the cameras, and the switch are on a battery.

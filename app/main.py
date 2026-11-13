@@ -1,3 +1,5 @@
+import asyncio
+import base64
 import hashlib
 import json
 import os
@@ -6,22 +8,25 @@ import secrets
 import shutil
 import subprocess
 import time
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, List
+from xml.sax.saxutils import escape
 
 import jwt
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel, Field
 
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 
-from . import events, push  # noqa: E402
+from . import events, live, push, sms  # noqa: E402
 from .alert import trigger_alert  # noqa: E402
 from .detector import COOLDOWN, CONFIRM_HITS, CameraProcessor  # noqa: E402
 from .health import health_check  # noqa: E402
@@ -108,7 +113,10 @@ def _start_tunnel() -> None:
 
 @asynccontextmanager
 async def lifespan(_app):
+    live.bind(asyncio.get_running_loop())
     _start_tunnel()
+    sms.start()
+    push.start()
     try:
         settings.update(json.loads(SET_FILE.read_text()))
     except Exception:
@@ -119,6 +127,7 @@ async def lifespan(_app):
     except Exception:
         pass
     yield
+    sms.stop()
     for p in list(cameras.values()):
         p.stop_event.set()
     if _tunnel["proc"]:
@@ -126,6 +135,7 @@ async def lifespan(_app):
 
 
 app = FastAPI(title="Swarm Detection Service", lifespan=lifespan)
+app.add_middleware(GZipMiddleware, minimum_size=500)
 bearer = HTTPBearer(auto_error=False)
 
 
@@ -298,6 +308,48 @@ def push_subscribe(sub: dict, _: str = Depends(require_auth)):
     return {"ok": True, "devices": len(push.subscriptions())}
 
 
+def _sse(obj) -> str:
+    return "data: " + json.dumps(obj) + "\n\n"
+
+
+@app.get("/alerts/live")
+async def alerts_live(once: int = 0, _: str = Depends(require_auth)):
+    """LAN alarm stream. Manual SSE so Python 3.9's older FastAPI pin still starts.
+
+    once=1 returns the latest alarm and closes. The dashboard leaves it off and stays connected.
+    """
+    q = live.subscribe()
+
+    async def gen():
+        try:
+            recent = live.recent()
+            if recent:
+                yield _sse(recent)
+            yield _sse({"ready": True})
+            if once:
+                return
+            while True:
+                item = await live.wait(q, 15)
+                yield ": keepalive\n\n" if item is None else _sse(item)
+        finally:
+            live.unsubscribe(q)
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.get("/alerts/delivery")
+def alert_delivery(_: str = Depends(require_auth)):
+    state = sms.status()
+    state["push_pending"] = push.pending()
+    state["server_sound"] = os.getenv("SWARM_SERVER_SOUND", "1") == "1"
+    state["local_hook"] = bool(os.getenv("SWARM_LOCAL_HOOK", "").strip())
+    return state
+
+
 @app.get("/events")
 def get_events(_: str = Depends(require_auth)):
     return {"events": events.recent(100)}
@@ -319,10 +371,91 @@ def discover_cameras(_: str = Depends(require_auth)):
     return {"devices": discover()}
 
 
+def _install_origin(request: Request) -> str:
+    proto = (request.headers.get("x-forwarded-proto") or request.url.scheme).split(",")[0].strip()
+    host = (request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc).split(",")[0].strip()
+    return f"{proto}://{host}".rstrip("/")
+
+
+def _webclip_icon() -> str:
+    try:
+        return base64.b64encode((ROOT / "ui" / "apple-touch-icon.png").read_bytes()).decode("ascii")
+    except OSError:
+        return ""
+
+
 @app.get("/install")
 def install_page():
     """Phone installer. No login, so an iPhone can open it before the dashboard is set up."""
     return FileResponse(ROOT / "installer.html", media_type="text/html")
+
+
+@app.api_route("/install.mobileconfig", methods=["GET", "HEAD"])
+def install_mobileconfig(request: Request):
+    """One-tap iPhone Home Screen icon. Safari opens Settings; the user taps Install."""
+    origin = _install_origin(request)
+    clip_uid = str(uuid.uuid5(uuid.NAMESPACE_URL, origin + "/swarm-webclip"))
+    prof_uid = str(uuid.uuid5(uuid.NAMESPACE_URL, origin + "/swarm-profile"))
+    tag = clip_uid.split("-")[0]
+    icon = _webclip_icon()
+    icon_xml = f"<key>Icon</key><data>{icon}</data>" if icon else ""
+    body = f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>PayloadContent</key>
+  <array>
+    <dict>
+      <key>FullScreen</key>
+      <true/>
+      {icon_xml}
+      <key>IsRemovable</key>
+      <true/>
+      <key>Label</key>
+      <string>Swarm</string>
+      <key>PayloadDescription</key>
+      <string>Swarm Detection</string>
+      <key>PayloadDisplayName</key>
+      <string>Swarm</string>
+      <key>PayloadIdentifier</key>
+      <string>com.coden607.swarm.webclip.{tag}</string>
+      <key>PayloadType</key>
+      <string>com.apple.webClip.managed</string>
+      <key>PayloadUUID</key>
+      <string>{clip_uid}</string>
+      <key>PayloadVersion</key>
+      <integer>1</integer>
+      <key>Precomposed</key>
+      <true/>
+      <key>URL</key>
+      <string>{escape(origin)}/</string>
+    </dict>
+  </array>
+  <key>PayloadDisplayName</key>
+  <string>Swarm</string>
+  <key>PayloadIdentifier</key>
+  <string>com.coden607.swarm.{tag}</string>
+  <key>PayloadOrganization</key>
+  <string>Swarm Detection</string>
+  <key>PayloadRemovalDisallowed</key>
+  <false/>
+  <key>PayloadType</key>
+  <string>Configuration</string>
+  <key>PayloadUUID</key>
+  <string>{prof_uid}</string>
+  <key>PayloadVersion</key>
+  <integer>1</integer>
+</dict>
+</plist>
+"""
+    return Response(
+        content=body,
+        media_type="application/x-apple-aspen-config",
+        headers={
+            "Content-Disposition": 'inline; filename="swarm.mobileconfig"',
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 # Static UI last so it never shadows API routes
