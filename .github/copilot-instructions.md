@@ -1,0 +1,2 @@
+# Copilot: Swarm
+Read `AGENTS.md` first. Project: FastAPI/OpenCV crowd detection, PWA, Android/iOS, cross-platform installation; **not** multi-agent orchestration. Preserve `MISSION.md` and `FACTORY_RULES.md`. Use synthetic camera sources, `SWARM_DETECTOR=local`, `SWARM_REMOTE=0` and privacy review for network/auth changes. Do not expose .env, camera credentials or frames. Run `python -m pytest -q` and affected CI jobs; report skips, create PR and do not merge. See `docs/agent-workspace.md`.

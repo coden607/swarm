@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "kind": "advisory-not-enforced",
+  "repository": "coden607/swarm",
+  "default_profile": "review",
+  "profiles": {
+    "review": {
+      "read": [
+        "repository",
+        "public-actions",
+        "synthetic-tests"
+      ],
+      "write": []
+    },
+    "implement": {
+      "read": [
+        "repository",
+        "public-actions",
+        "synthetic-tests"
+      ],
+      "write": [
+        "feature-branch",
+        "pull-request"
+      ]
+    },
+    "release": {
+      "read": [
+        "repository",
+        "verified-actions"
+      ],
+      "write": [],
+      "human_required": [
+        "merge",
+        "sign",
+        "deploy",
+        "publish"
+      ]
+    }
+  },
+  "sensitive_data": [
+    "real-camera-frames",
+    "secrets",
+    "camera-urls-with-credentials",
+    "private-device-inventory",
+    "push-endpoints"
+  ],
+  "human_only": [
+    "force-push",
+    "merge",
+    "production-deploy",
+    "paid-api",
+    "live-camera-discovery",
+    "external-frame-transfer",
+    "public-tunnel",
+    "secret-access",
+    "destructive-cleanup"
+  ],
+  "local_skills": [
+    "swarm-camera-debug",
+    "swarm-privacy-audit",
+    "swarm-release-review"
+  ],
+  "shared_skills": "https://github.com/coden607/skills",
+  "router": "ContinuityOS if connected/verified"
+}
