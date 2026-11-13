@@ -313,8 +313,11 @@ def _sse(obj) -> str:
 
 
 @app.get("/alerts/live")
-async def alerts_live(_: str = Depends(require_auth)):
-    """LAN alarm stream. Manual SSE so Python 3.9's older FastAPI pin still starts."""
+async def alerts_live(once: int = 0, _: str = Depends(require_auth)):
+    """LAN alarm stream. Manual SSE so Python 3.9's older FastAPI pin still starts.
+
+    once=1 returns the latest alarm and closes. The dashboard leaves it off and stays connected.
+    """
     q = live.subscribe()
 
     async def gen():
@@ -323,6 +326,8 @@ async def alerts_live(_: str = Depends(require_auth)):
             if recent:
                 yield _sse(recent)
             yield _sse({"ready": True})
+            if once:
+                return
             while True:
                 item = await live.wait(q, 15)
                 yield ": keepalive\n\n" if item is None else _sse(item)
