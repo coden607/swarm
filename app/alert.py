@@ -8,7 +8,7 @@ from email.message import EmailMessage
 from pathlib import Path
 from typing import List
 
-from . import events, live, push, sms
+from . import events, live, ntfy, push, sms
 
 _ROOT = Path(__file__).resolve().parent.parent
 _DATA = Path(os.getenv("SWARM_DATA_DIR", _ROOT / "data"))
@@ -90,7 +90,11 @@ def trigger_alert(count: int, email_addresses: List[str], label: str = "") -> No
         print(f"[alert] local fanout failed: {e}")
     _local_hook(msg)
     if os.getenv("SWARM_SERVER_SOUND", "1") == "1":
-        subprocess.Popen([sys.executable, "-c", "import app.alert as a; a.play_alarm()"], cwd=str(_ROOT))
+        subprocess.Popen(
+            [sys.executable, "-c", "import app.alert as a\nfor _ in range(3):\n    a.play_alarm()"],
+            cwd=str(_ROOT),
+        )
+    ntfy.publish_async(msg)
     try:
         events.add(label, count)
     except Exception as e:

@@ -8,9 +8,10 @@ Camera streams stay on the Swarm server. The server counts locally. The iPhone i
 - `SWARM_LOCAL_HOOK`, a local program started with the alert text as one argument. No shell. Use it for a siren relay or an MQTT command on the LAN.
 
 ## What waits for an uplink
-Web Push, email, and optional Twilio SMS are written locally and retried. Web Push retries live in `data/push-outbox.json`. SMS retries live in `data/sms-outbox.sqlite3`. `GET /alerts/delivery` reports only whether SMS is configured, how many SMS and Web Push messages are waiting, and whether the local siren and hook are enabled. It does not return phone numbers or message text.
+Web Push and email are written locally and retried. Web Push retries live in `data/push-outbox.json`. Twilio SMS is paid, so leave it unset. `GET /alerts/delivery` reports whether SMS is configured, how many messages are waiting, whether the local siren and hook are enabled, and the free ntfy subscribe address. It does not return phone numbers or message text.
 
-SMS is off until all four are set: `SWARM_SMS_TWILIO_SID`, `SWARM_SMS_TWILIO_TOKEN`, `SWARM_SMS_FROM`, `SWARM_SMS_TO`. Values are E.164 (`+15551212`). The SMS queue is at least once, capped at 1,000, and stores a short count and label, never a frame.
+## Free phone alarm
+`SWARM_NTFY=1` posts the same short count to a ntfy server on this machine (`http://127.0.0.1:2586` unless `SWARM_NTFY_URL` is set). The phone app subscribes to the LAN address from the dashboard. There is no account and no per-alert fee. Android on this Wi-Fi gets it immediately, including when the internet is down. An iPhone gets an instant beep from the server speaker and from an open dashboard. Self-hosted ntfy cannot ring a locked iPhone in the background; that needs Apple's push service. Paid Twilio SMS stays available only if all four `SWARM_SMS_*` values are set.
 
 ## What a power cut does
 If the Swarm computer loses power, counting stops. Put the computer, the cameras, and the switch on a battery if the alarm has to survive a blackout. A phone away from home still needs a way off the site. A cellular router on that same battery is the way to deliver SMS or Web Push while the home internet is down. No software path can notify that phone when the site has neither power nor any uplink.

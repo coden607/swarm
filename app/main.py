@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 
-from . import events, live, push, sms  # noqa: E402
+from . import events, live, ntfy, push, sms  # noqa: E402
 from .alert import trigger_alert  # noqa: E402
 from .detector import COOLDOWN, CONFIRM_HITS, CameraProcessor  # noqa: E402
 from .health import health_check  # noqa: E402
@@ -347,6 +347,7 @@ def alert_delivery(_: str = Depends(require_auth)):
     state["push_pending"] = push.pending()
     state["server_sound"] = os.getenv("SWARM_SERVER_SOUND", "1") == "1"
     state["local_hook"] = bool(os.getenv("SWARM_LOCAL_HOOK", "").strip())
+    state.update(ntfy.status())
     return state
 
 
