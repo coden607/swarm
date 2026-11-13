@@ -43,8 +43,8 @@
   /* glass cards with a holographic rim */
   .card{position:relative;background:var(--glass);backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);border:1px solid var(--edge);border-radius:18px;padding:1.1rem;margin:.85rem 0;box-shadow:0 10px 40px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.06);animation:rise .5s cubic-bezier(.2,.8,.2,1) both;overflow:hidden}
   .card::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;background:var(--holo);background-size:300% 100%;-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.35;animation:holo 10s linear infinite;pointer-events:none}
-  .card::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.07),transparent);transform:skewX(-20deg);animation:sheen 7s ease-in-out infinite;pointer-events:none}
-  @keyframes sheen{0%,70%{left:-60%}100%{left:130%}}
+  .card::after{content:"";position:absolute;top:0;left:0;width:40%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.07),transparent);transform:translateX(-160%) skewX(-20deg);animation:sheen 7s ease-in-out infinite;pointer-events:none}
+  @keyframes sheen{0%,70%{transform:translateX(-160%) skewX(-20deg)}100%{transform:translateX(420%) skewX(-20deg)}}
   @keyframes rise{from{opacity:0}}
   input,select,button{font:inherit;padding:.75rem .9rem;margin:.3rem 0;width:100%;border-radius:12px;color:var(--ink)}
   input,select{background:rgba(5,8,25,.6);border:1px solid var(--edge);outline:none;transition:border-color .2s,box-shadow .2s}
