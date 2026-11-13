@@ -188,6 +188,7 @@
       <button id="pushbtn" class="sec">Enable alerts on this device</button>
       <small>On this network the alarm arrives on the open dashboard immediately, with or without internet. A phone away from home needs Web Push (Safari → Add to Home Screen, then this button, iOS 16.4+, HTTPS) or SMS. Those wait and retry if the uplink is down. They cannot leave the building during a total outage.</small>
       <small id="pushmsg"></small>
+      <small id="ntfyhint"></small>
       <button id="install" class="sec" hidden>Install app on this device</button>
       <small id="ioshint" hidden>iPhone/iPad: one tap at <a href="/install">Install Swarm</a>, or Share → Add to Home Screen.</small>
     </div>
@@ -275,6 +276,13 @@ async function render() {
   $("login").hidden = !!token; $("app").hidden = !token;
   if (!token) { if (liveAbort) { liveAbort.abort(); liveAbort = null; } return; }
   startLive();
+  api("/alerts/delivery").then(d => {
+    const hint = $("ntfyhint");
+    if (!hint) return;
+    hint.textContent = d.ntfy_subscribe
+      ? "Free phone alarm on this Wi-Fi: install the ntfy app and subscribe to " + d.ntfy_subscribe
+      : "";
+  }, () => {});
   await refresh(); tick = setInterval(refresh, 2000);
 }
 

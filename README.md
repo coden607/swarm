@@ -50,7 +50,7 @@ Cameras reconnect automatically and are remembered across restarts.
 ## When the power or the internet fails
 The count and the siren run on the Swarm computer. They keep working with no internet. Dashboards on the same LAN beep as soon as the alarm is raised.
 
-Web Push, email, and optional Twilio SMS are queued on disk and sent when an uplink returns. They cannot reach a phone that is away from home while the site has no uplink. Set `SWARM_LOCAL_HOOK` to a local program (a siren relay or an MQTT command on the LAN) for another on-site alarm.
+Web Push and email are queued on disk and sent when an uplink returns. They cannot reach a phone that is away from home while the site has no uplink. Twilio SMS is optional and paid, so it stays off. The free phone alarm is a local [ntfy](https://ntfy.sh) server: set `SWARM_NTFY=1`, install the ntfy app, and subscribe to the address shown on the dashboard. That stays on the Wi-Fi and does not bill per alert. Set `SWARM_LOCAL_HOOK` to a local program (a siren relay or an MQTT command on the LAN) for another on-site alarm. `SWARM_CONFIRM_HITS=1` warns on the first over-threshold count, about one second after the camera sees people, and it also raises more false alarms.
 
 A power cut stops detection unless the Swarm computer, the cameras, and the switch are on a battery. Off-site alerts during an internet outage also need a cellular router on that battery. No app can notify a distant phone when the site has neither power nor any way out.
 
