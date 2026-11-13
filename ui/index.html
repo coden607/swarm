@@ -35,7 +35,9 @@
   main{max-width:720px;margin:auto;padding:1rem;padding-top:max(1.2rem,env(safe-area-inset-top));padding-bottom:max(2rem,env(safe-area-inset-bottom))}
   h1{margin:.4rem 0 1rem;font-size:clamp(1.9rem,6vw,2.6rem);font-weight:800;letter-spacing:-.02em;background:var(--holo);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:holo 8s linear infinite;filter:drop-shadow(0 0 18px rgba(155,92,255,.45))}
   h1::before{content:"";display:inline-block;width:.42em;height:.42em;margin-right:.45em;vertical-align:.12em;border-radius:50%;background:var(--lime);box-shadow:0 0 12px var(--lime),0 0 28px var(--lime);animation:pulse 2s ease-in-out infinite}
-  h3{margin:.1rem 0 .7rem;font-size:.82rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+  h2{margin:.1rem 0 .7rem;font-size:.82rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+  .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  label{display:block;color:var(--mute);font-size:.8rem}
   @keyframes holo{to{background-position:300% 0}}
   @keyframes pulse{50%{opacity:.45;transform:scale(.8)}}
   /* glass cards with a holographic rim */
@@ -43,7 +45,7 @@
   .card::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;background:var(--holo);background-size:300% 100%;-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.35;animation:holo 10s linear infinite;pointer-events:none}
   .card::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.07),transparent);transform:skewX(-20deg);animation:sheen 7s ease-in-out infinite;pointer-events:none}
   @keyframes sheen{0%,70%{left:-60%}100%{left:130%}}
-  @keyframes rise{from{opacity:0;transform:translateY(14px) scale(.985)}}
+  @keyframes rise{from{opacity:0}}
   input,select,button{font:inherit;padding:.75rem .9rem;margin:.3rem 0;width:100%;border-radius:12px;color:var(--ink)}
   input,select{background:rgba(5,8,25,.6);border:1px solid var(--edge);outline:none;transition:border-color .2s,box-shadow .2s}
   input::placeholder{color:#5f678f}
@@ -134,8 +136,10 @@
   <div id="err"></div>
 
   <div id="login" class="card" hidden>
-    <h3>Sign in</h3>
+    <h2>Sign in</h2>
+    <label class="sr" for="u">Username</label>
     <input id="u" placeholder="Username" value="admin" autocomplete="username" />
+    <label class="sr" for="p">Password</label>
     <input id="p" type="password" placeholder="Password (ADMIN_PASS in .env)" autocomplete="current-password" />
     <button id="go">Sign in</button>
   </div>
@@ -143,32 +147,36 @@
   <div id="app" hidden>
     <div id="banner" class="card"></div>
     <div class="card row">
-      <div><small>Combined swarm alert at (people, 0 = off)</small><input id="tt" type="number" min="0" value="0" /></div>
+      <div><label for="tt">Combined swarm alert at (people, 0 = off)</label><input id="tt" type="number" min="0" value="0" /></div>
       <div><small>&nbsp;</small><button id="tts" class="sec">Save</button></div>
     </div>
 
     <div id="list"></div>
 
     <div class="card">
-      <h3>Recent alerts</h3>
+      <h2>Recent alerts</h2>
       <div id="events"><small>None yet</small></div>
     </div>
 
     <div class="card" id="addcard">
-      <h3>Add camera</h3>
+      <h2>Add camera</h2>
       <div class="view-toggle">
         <button id="viewGrid" class="sec active">Grid view</button>
         <button id="viewSingle" class="sec">Single view</button>
       </div>
       <button id="quicksetup">Quick setup – scan & add cameras</button>
+      <label class="sr" for="curl">Camera address</label>
       <input id="curl" placeholder="Camera IP (192.168.1.20), rtsp://…, http://…, or 0 for USB webcam" />
-      <div class="row"><input id="cu" placeholder="Camera username (optional)" autocomplete="off" /><input id="cp" type="password" placeholder="Camera password" autocomplete="new-password" /></div>
+      <div class="row"><label class="sr" for="cu">Camera username</label><input id="cu" placeholder="Camera username (optional)" autocomplete="off" /><label class="sr" for="cp">Camera password</label><input id="cp" type="password" placeholder="Camera password" autocomplete="new-password" /></div>
       <div class="row">
+        <label class="sr" for="brand">Camera brand</label>
         <select id="brand"><option value="generic">Brand: auto-detect</option><option>onvif</option><option>hikvision</option><option>annke</option><option>ezviz</option><option>dahua</option><option>amcrest</option><option>lorex</option><option>imou</option><option>axis</option><option>reolink</option><option>tapo</option><option>foscam</option><option>unifi</option><option>uniview</option><option>hanwha</option><option>vivotek</option><option>bosch</option><option>geovision</option><option>tvt</option><option>tiandy</option><option>honeywell</option><option>panasonic</option><option>sony</option><option>avigilon</option><option>speco</option><option>wyze</option><option>xmeye</option></select>
+        <label class="sr" for="thr">People that trigger an alert</label>
         <input id="thr" type="number" min="1" value="10" title="People that trigger an alert" />
       </div>
       <small id="tip"></small>
       <small>Alerts wait until the count stays over the threshold, so a single bad frame stays quiet. Counting keeps running with no internet.</small>
+      <label class="sr" for="cid">Camera name</label>
       <input id="cid" placeholder="Name (optional, e.g. front-door)" />
       <button id="add">Add camera</button>
       <div class="row"><button id="scan" class="sec">Scan network for cameras</button><button id="phone" class="sec">Use this device's camera</button></div>
@@ -284,7 +292,7 @@ function draw(s, ev, offlineTs) {
     s.cameras.forEach(c => {
       const d = document.createElement("div"); d.className = "card" + (c.alarm && !offlineTs ? " alarm" : "");
       d.innerHTML = `<div class="row"><b></b><span class="count" style="text-align:right"></span></div><img class="live" alt=""><small class="u"></small><br><small class="st"></small>
-        <div class="row"><input type="number" min="1" title="Alert threshold"><button class="sv">Save threshold</button><button class="del">Remove</button></div>`;
+        <div class="row"><label class="sr">Alert threshold</label><input type="number" min="1" title="Alert threshold" aria-label="Alert threshold"><button class="sv">Save threshold</button><button class="del">Remove</button></div>`;
       d.querySelector("b").textContent = `${c.id} (${c.brand})`;
       d.querySelector(".count").textContent = c.count === null ? "–" : c.count;
       const im = d.querySelector("img.live"); im.dataset.id = c.id; if (thumbs[c.id]) im.src = thumbs[c.id]; else im.style.display = "none";

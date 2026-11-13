@@ -20,6 +20,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel, Field
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -134,6 +135,7 @@ async def lifespan(_app):
 
 
 app = FastAPI(title="Swarm Detection Service", lifespan=lifespan)
+app.add_middleware(GZipMiddleware, minimum_size=500)
 bearer = HTTPBearer(auto_error=False)
 
 
